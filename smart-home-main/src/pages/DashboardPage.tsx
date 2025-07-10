@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,87 +37,98 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true); // NEW: loading state
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Seed with example data if no listings exist
-    const existingListings = localStorage.getItem('listings');
-    if (!existingListings || JSON.parse(existingListings).length === 0) {
-      const dummyListings = [
-        {
-          id: '101',
-          title: 'Spacious Room in Sunny Apartment',
-          location: 'Williamsburg, Brooklyn',
-          rent: 1450,
-          isVerified: true,
-          listerName: 'Alex',
-          listerAge: 28,
-        },
-        {
-          id: '102',
-          title: 'Cozy Bedroom near Downtown',
-          location: 'East Village, Manhattan',
-          rent: 1600,
-          isVerified: true,
-          listerName: 'Jessica',
-          listerAge: 25,
-        },
-        {
-          id: '103',
-          title: 'Modern Loft with a Great View',
-          location: 'DUMBO, Brooklyn',
-          rent: 1800,
-          isVerified: true,
-          listerName: 'Mike',
-          listerAge: 31,
-        },
-        {
-          id: '104',
-          title: 'Quiet and Bright Room in Queens',
-          location: 'Astoria, Queens',
-          rent: 1100,
-          isVerified: false,
-          listerName: 'Sarah',
-          listerAge: 29,
-        },
-        {
-          id: '105',
-          title: 'Artistic Space in Bushwick',
-          location: 'Bushwick, Brooklyn',
-          rent: 1250,
-          isVerified: true,
-          listerName: 'David',
-          listerAge: 27,
-        },
-        {
-          id: '106',
-          title: 'Charming Room in Historic Brownstone',
-          location: 'Harlem, Manhattan',
-          rent: 1300,
-          isVerified: true,
-          listerName: 'Chloe',
-          listerAge: 26,
-        }
-      ];
-      localStorage.setItem('listings', JSON.stringify(dummyListings));
-    }
-
-    const profileData = localStorage.getItem('userProfile');
-    if (profileData) {
-      const profile = JSON.parse(profileData);
-      setUserProfile(profile);
-
-      const allListings = JSON.parse(localStorage.getItem('listings') || '[]');
-      
-      if (profile.userType === 'seeker') {
-        setListings(allListings);
-      } else {
-        const myListings = allListings.filter((l: any) => l.listerName === 'You');
-        setListings(myListings);
+    setLoading(true);
+    // Simulate async fetch (replace with your Gemini/API call if needed)
+    timeoutRef.current = setTimeout(() => {
+      // Seed with example data if no listings exist
+      const existingListings = localStorage.getItem('listings');
+      if (!existingListings || JSON.parse(existingListings).length === 0) {
+        const dummyListings = [
+          {
+            id: '101',
+            title: 'Spacious Room in Sunny Apartment',
+            location: 'Williamsburg, Brooklyn',
+            rent: 1450,
+            isVerified: true,
+            listerName: 'Alex',
+            listerAge: 28,
+          },
+          {
+            id: '102',
+            title: 'Cozy Bedroom near Downtown',
+            location: 'East Village, Manhattan',
+            rent: 1600,
+            isVerified: true,
+            listerName: 'Jessica',
+            listerAge: 25,
+          },
+          {
+            id: '103',
+            title: 'Modern Loft with a Great View',
+            location: 'DUMBO, Brooklyn',
+            rent: 1800,
+            isVerified: true,
+            listerName: 'Mike',
+            listerAge: 31,
+          },
+          {
+            id: '104',
+            title: 'Quiet and Bright Room in Queens',
+            location: 'Astoria, Queens',
+            rent: 1100,
+            isVerified: false,
+            listerName: 'Sarah',
+            listerAge: 29,
+          },
+          {
+            id: '105',
+            title: 'Artistic Space in Bushwick',
+            location: 'Bushwick, Brooklyn',
+            rent: 1250,
+            isVerified: true,
+            listerName: 'David',
+            listerAge: 27,
+          },
+          {
+            id: '106',
+            title: 'Charming Room in Historic Brownstone',
+            location: 'Harlem, Manhattan',
+            rent: 1300,
+            isVerified: true,
+            listerName: 'Chloe',
+            listerAge: 26,
+          }
+        ];
+        localStorage.setItem('listings', JSON.stringify(dummyListings));
       }
 
-    } else {
-      navigate('/onboarding?type=seeker');
-    }
+      const profileData = localStorage.getItem('userProfile');
+      if (profileData) {
+        const profile = JSON.parse(profileData);
+        setUserProfile(profile);
+
+        const allListings = JSON.parse(localStorage.getItem('listings') || '[]');
+        
+        if (profile.userType === 'seeker') {
+          setListings(allListings);
+        } else {
+          const myListings = allListings.filter((l: any) => l.listerName === 'You');
+          setListings(myListings);
+        }
+
+      } else {
+        navigate('/onboarding?type=seeker');
+      }
+      setLoading(false); // Done loading
+    }, 1000); // Simulate 1s delay
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, [navigate]);
 
   const getCompatibilityData = (userProfile: UserProfile) => {
@@ -175,7 +186,7 @@ const DashboardPage = () => {
     };
   };
 
-  if (!userProfile) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <div className="text-center">
