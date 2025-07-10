@@ -16,7 +16,7 @@ const Index = () => {
   const handleCTAClick = (type: 'find' | 'list') => {
     if (isSignedIn) {
       if (type === 'find') {
-        window.location.href = `/onboarding?type=find`;
+        navigate('/dashboard');
       } else {
         navigate('/create-listing');
       }
