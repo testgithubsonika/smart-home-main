@@ -46,6 +46,7 @@ const OnboardingPage = () => {
     const [currentInput, setCurrentInput] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const [chat, setChat] = useState<any>(null);
+    const [questionCount, setQuestionCount] = useState(0);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +74,7 @@ const OnboardingPage = () => {
             }
 
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
             // *** Use the dynamic prompt from the library ***
             const systemPrompt = createSystemPrompt(userType);
@@ -120,9 +121,14 @@ const OnboardingPage = () => {
         setMessages(prev => [...prev, userMessage]);
         setCurrentInput("");
         setIsTyping(true);
+        setQuestionCount(prev => prev + 1);
 
         try {
-            const result = await chat.sendMessage(currentInput);
+            let promptToSend = currentInput;
+            if (questionCount >= 6) { // On the 7th user message, force the summary
+                promptToSend = `This is the final piece of information. Please generate the complete user profile JSON based on our entire conversation. Ensure all fields in the UserProfile are filled.`;
+            }
+            const result = await chat.sendMessage(promptToSend);
             const response = result.response;
             let text = response.text();
 
@@ -207,7 +213,7 @@ const OnboardingPage = () => {
                         {/* Chat Header */}
                         <div className="bg-gradient-hero px-6 py-4 text-primary-foreground">
                             <h2 className="text-xl font-semibold">AI Roommate Profiling</h2>
-                            <p className="text-sm opacity-90">Building your compatibility DNA...</p>
+                            <p className="text-sm opacity-90">Building your compatibility DNA... (Question {questionCount + 1} of 7)</p>
                         </div>
 
                         {/* Messages Area */}
