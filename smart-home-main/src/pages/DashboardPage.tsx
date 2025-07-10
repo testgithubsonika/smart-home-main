@@ -93,15 +93,6 @@ const DashboardPage = () => {
             listerName: 'David',
             listerAge: 27,
           },
-          {
-            id: '106',
-            title: 'Charming Room in Historic Brownstone',
-            location: 'Harlem, Manhattan',
-            rent: 1300,
-            isVerified: true,
-            listerName: 'Chloe',
-            listerAge: 26,
-          }
         ];
         localStorage.setItem('listings', JSON.stringify(dummyListings));
       }
