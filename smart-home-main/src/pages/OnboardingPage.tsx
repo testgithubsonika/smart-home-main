@@ -74,7 +74,7 @@ const OnboardingPage = () => {
             }
 
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
             // *** Use the dynamic prompt from the library ***
             const systemPrompt = createSystemPrompt(userType);
@@ -125,7 +125,7 @@ const OnboardingPage = () => {
 
         try {
             let promptToSend = currentInput;
-            if (questionCount >= 6) { // On the 7th user message, force the summary
+            if (questionCount >= 17) { // On the 17th user message, force the summary
                 promptToSend = `This is the final piece of information. Please generate the complete user profile JSON based on our entire conversation. Ensure all fields in the UserProfile are filled.`;
             }
             const result = await chat.sendMessage(promptToSend);
