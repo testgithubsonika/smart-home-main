@@ -15,10 +15,12 @@ const Index = () => {
 
   const handleCTAClick = (type: 'find' | 'list') => {
     if (isSignedIn) {
+      // Both 'find' and 'list' users now navigate to onboarding
+      // with their respective types if already signed in.
       if (type === 'find') {
-        navigate('/dashboard');
+        window.location.href = `/onboarding?type=seeker`; // Explicitly set seeker for 'find'
       } else {
-        navigate('/create-listing');
+        window.location.href = `/onboarding?type=lister`; // Explicitly set lister for 'list'
       }
     } else {
       setIsModalOpen(true);
@@ -36,7 +38,7 @@ const Index = () => {
       <HeroSection onCTAClick={handleCTAClick} />
       <HowItWorksSection />
       <FeaturesSection />
-      
+
       <UserTypeModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

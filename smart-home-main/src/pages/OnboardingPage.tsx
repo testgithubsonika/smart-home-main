@@ -17,26 +17,11 @@ interface ChatMessage {
     timestamp: string;
 }
 
-// Updated UserProfile to reflect the new detailed structure
+// This interface remains for context but is not explicitly parsed from the AI anymore
 interface UserProfile {
     userType: 'seeker' | 'lister';
-    core_vibe: {
-        cleanliness: string;
-        social_level: string;
-        noise_preference: string;
-        sleep_schedule: string;
-    };
-    social_dynamics: {
-        guest_frequency: string;
-        overnight_guests: string;
-        party_policy: string;
-    };
-    communication_style: {
-        preferred_method: string;
-        urgency_handling: string;
-    };
+    // ... other properties
 }
-
 
 const OnboardingPage = () => {
     const navigate = useNavigate();
@@ -74,7 +59,7 @@ const OnboardingPage = () => {
             }
 
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Updated model for efficiency
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Efficient model
 
             // Use the dynamic prompt from the library
             const systemPrompt = createSystemPrompt(userType);
@@ -82,7 +67,7 @@ const OnboardingPage = () => {
             const chatInstance = model.startChat({
                 history: [{ role: "user", parts: [{ text: systemPrompt }] }],
                 generationConfig: {
-                    maxOutputTokens: 800,
+                    maxOutputTokens: 200, // Reduced token count for shorter answers
                     temperature: 0.7,
                 },
             });
@@ -119,57 +104,37 @@ const OnboardingPage = () => {
         };
 
         setMessages(prev => [...prev, userMessage]);
+        const currentQuestionCount = questionCount;
+        setQuestionCount(prev => prev + 1);
         setCurrentInput("");
         setIsTyping(true);
-        
-        try {
-            let promptToSend = currentInput;
-            
-            // MODIFIED LOGIC: Check if questionCount is 3. 
-            // On the 4th user message, the count (0, 1, 2, 3) will be 3, triggering the final summary.
-            if (questionCount >= 3) { 
-                promptToSend = `This is the final piece of information. Please generate the complete user profile JSON based on our entire conversation. Ensure all fields in the UserProfile are filled.`;
-            }
 
-            const result = await chat.sendMessage(promptToSend);
-            const response = result.response;
-            let text = response.text();
+        // If this is the 3rd user message (0, 1, 2), start navigation logic
+        if (currentQuestionCount >= 2) {
+            const finalMessage: ChatMessage = {
+                id: Date.now() + 1,
+                message: "Great, that's all I need for now! Taking you to the next step...",
+                isUser: false,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            setMessages(prev => [...prev, finalMessage]);
 
-            // Increment the count for the next interaction (if any).
-            setQuestionCount(prev => prev + 1);
-
-            try {
-                const jsonString = text.replace(/```json|```/g, '').trim();
-                const responseObject = JSON.parse(jsonString);
-
-                // Assuming the final response will be a specific JSON structure.
-                // You might need to adjust this check based on your prompt instructions.
-                if (responseObject.userProfile) { 
-                    const profile: UserProfile = { userType, ...responseObject.userProfile };
-                    localStorage.setItem('userProfile', JSON.stringify(profile));
-
-                    const finalMessage: ChatMessage = {
-                        id: Date.now() + 1,
-                        message: "Great, your Roommate DNA profile is complete! Taking you to the next step...",
-                        isUser: false,
-                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    };
-                    setMessages(prev => [...prev, finalMessage]);
-
-                    setTimeout(() => {
-                        if (profile.userType === 'seeker') {
-                            navigate('/dashboard');
-                        } else {
-                            navigate('/create-listing');
-                        }
-                    }, 2000);
-
-                    setIsTyping(false);
-                    return; // Stop processing since we are done
+            setTimeout(() => {
+                if (userType === 'seeker') {
+                    navigate('/dashboard');
+                } else {
+                    navigate('/create-listing');
                 }
-            } catch (e) {
-                // Not a JSON object, treat as a regular message
-            }
+            }, 2500); // Wait 2.5 seconds before navigating
+
+            setIsTyping(false);
+            return;
+        }
+
+        try {
+            const result = await chat.sendMessage(currentInput);
+            const response = result.response;
+            const text = response.text();
 
             const aiMessage: ChatMessage = {
                 id: Date.now() + 1,
@@ -183,7 +148,7 @@ const OnboardingPage = () => {
             console.error("Error sending message to Gemini:", error);
             const errorMessage: ChatMessage = {
                 id: Date.now() + 1,
-                message: "Sorry, I'm having a little trouble connecting right now. Please try again in a moment.",
+                message: "Sorry, I'm having a little trouble connecting. Please try again in a moment.",
                 isUser: false,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
