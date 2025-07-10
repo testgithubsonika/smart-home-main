@@ -14,7 +14,7 @@ const Index = () => {
   const { isSignedIn } = useUser();
 
   const handleCTAClick = (type: 'find' | 'list') => {
-    if (isSignedIn) {
+    
       // Both 'find' and 'list' users now navigate to onboarding
       // with their respective types if already signed in.
       if (type === 'find') {
@@ -22,9 +22,7 @@ const Index = () => {
       } else {
         window.location.href = `/onboarding?type=lister`; // Explicitly set lister for 'list'
       }
-    } else {
-      setIsModalOpen(true);
-    }
+     
   };
 
   const handleUserTypeSelect = (userType: 'seeker' | 'lister') => {
