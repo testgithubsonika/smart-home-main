@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/e6156c16-beec-4796-9bbf-5293fade3867
+
 # Smart Roomie
 
 **Find your perfect roommate with Smart Roomie, an intelligent platform that uses AI and sensor verification to match you with compatible roommates based on lifestyle, not just budget.**
