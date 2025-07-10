@@ -6,6 +6,12 @@ import { ListingCard } from "@/components/ListingCard";
 import { Search, Filter, ArrowLeft, User } from "lucide-react";
 import room1Image from "@/assets/room-1.jpg";
 import room2Image from "@/assets/room-2.jpg";
+import room3Image from "@/assets/room-3.jpg";
+import room4Image from "@/assets/room-4.jpg";
+import room5Image from "@/assets/third.jpg";
+import room6Image from "@/assets/living-room.jpg";
+import room7Image from "@/assets/dinner.jpg";
+import room8Image from "@/assets/drawingroom.jpg";
 
 interface Listing {
   id: string;
@@ -188,6 +194,8 @@ const DashboardPage = () => {
     return Math.round((matches / compatibilityFactors.length) * 100);
   };
 
+  const images = [room1Image, room2Image, room3Image, room4Image, room5Image, room6Image, room7Image, room8Image]; // Add as many images as you want
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <div className="container mx-auto px-6 py-8">
@@ -270,7 +278,7 @@ const DashboardPage = () => {
                 title={listing.title}
                 location={listing.location}
                 rent={listing.rent}
-                image={index % 2 === 0 ? room1Image : room2Image} // Cycle through placeholder images
+                image={images[index % images.length]} // Cycle through placeholder images
                 isVerified={listing.isVerified}
                 matchScore={userProfile.userType === 'seeker' ? getMatchScore(compatibility.listing1) : undefined}
                 compatibility={userProfile.userType === 'seeker' ? compatibility.listing1 : []}
