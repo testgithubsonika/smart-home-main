@@ -125,7 +125,7 @@ const OnboardingPage = () => {
 
         try {
             let promptToSend = currentInput;
-            if (questionCount >= 17) { // On the 17th user message, force the summary
+            if (questionCount >= 5) { // On the 5th user message, force the summary
                 promptToSend = `This is the final piece of information. Please generate the complete user profile JSON based on our entire conversation. Ensure all fields in the UserProfile are filled.`;
             }
             const result = await chat.sendMessage(promptToSend);
