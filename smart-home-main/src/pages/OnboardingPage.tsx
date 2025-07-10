@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { ChatBubble } from "@/components/ChatBubble";
 import { Send, ArrowLeft } from "lucide-react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-// Import the new prompt creation function
 import { createSystemPrompt } from "@/promptLibrary";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -17,12 +16,6 @@ interface ChatMessage {
     timestamp: string;
 }
 
-// This interface remains for context but is not explicitly parsed from the AI anymore
-interface UserProfile {
-    userType: 'seeker' | 'lister';
-    // ... other properties
-}
-
 const OnboardingPage = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -31,7 +24,7 @@ const OnboardingPage = () => {
     const [currentInput, setCurrentInput] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const [chat, setChat] = useState<any>(null);
-    const [questionCount, setQuestionCount] = useState(0);
+    const [messageCount, setMessageCount] = useState(0);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -43,14 +36,13 @@ const OnboardingPage = () => {
         scrollToBottom();
     }, [messages]);
 
-    // Initialize the chat
     useEffect(() => {
         const initChat = async () => {
             if (!API_KEY) {
                 console.error("VITE_GEMINI_API_KEY is not set.");
                 const errorMessage = {
                     id: Date.now(),
-                    message: "Configuration error: The AI service is currently unavailable. Please contact support.",
+                    message: "Configuration error: The AI service is currently unavailable.",
                     isUser: false,
                     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 };
@@ -59,24 +51,23 @@ const OnboardingPage = () => {
             }
 
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Efficient model
-
-            // Use the dynamic prompt from the library
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
             const systemPrompt = createSystemPrompt(userType);
 
             const chatInstance = model.startChat({
                 history: [{ role: "user", parts: [{ text: systemPrompt }] }],
                 generationConfig: {
-                    maxOutputTokens: 200, // Reduced token count for shorter answers
-                    temperature: 0.7,
+                    maxOutputTokens: 250,
+                    temperature: 0.8,
                 },
             });
 
             setChat(chatInstance);
             setIsTyping(true);
 
-            // Get the initial message from the AI
-            const result = await chatInstance.sendMessage(`Let's begin. I see you are a ${userType}. What's on your mind?`);
+            const result = await chatInstance.sendMessage(
+                `I see you're a ${userType}. To start, tell me a bit about your ideal living situation.`
+            );
             const response = result.response;
             const text = response.text();
 
@@ -104,16 +95,16 @@ const OnboardingPage = () => {
         };
 
         setMessages(prev => [...prev, userMessage]);
-        const currentQuestionCount = questionCount;
-        setQuestionCount(prev => prev + 1);
         setCurrentInput("");
         setIsTyping(true);
 
-        // If this is the 3rd user message (0, 1, 2), start navigation logic
-        if (currentQuestionCount >= 2) {
+        const nextMessageCount = messageCount + 1;
+        setMessageCount(nextMessageCount);
+
+        if (nextMessageCount >= 3) {
             const finalMessage: ChatMessage = {
                 id: Date.now() + 1,
-                message: "Great, that's all I need for now! Taking you to the next step...",
+                message: "Perfect! Based on your preferences, I'm finding some great options for you now. One moment...",
                 isUser: false,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
@@ -125,7 +116,7 @@ const OnboardingPage = () => {
                 } else {
                     navigate('/create-listing');
                 }
-            }, 2500); // Wait 2.5 seconds before navigating
+            }, 2500);
 
             setIsTyping(false);
             return;
@@ -143,12 +134,11 @@ const OnboardingPage = () => {
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
             setMessages(prev => [...prev, aiMessage]);
-
         } catch (error) {
             console.error("Error sending message to Gemini:", error);
             const errorMessage: ChatMessage = {
                 id: Date.now() + 1,
-                message: "Sorry, I'm having a little trouble connecting. Please try again in a moment.",
+                message: "I'm having a little trouble connecting right now. Please try again in a moment.",
                 isUser: false,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
@@ -168,7 +158,6 @@ const OnboardingPage = () => {
     return (
         <div className="min-h-screen bg-gradient-subtle">
             <div className="container mx-auto px-6 py-8">
-                {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <Button
                         variant="ghost"
@@ -179,27 +168,21 @@ const OnboardingPage = () => {
                         Back to Home
                     </Button>
                 </div>
-
-                {/* Chat Container */}
                 <div className="max-w-2xl mx-auto">
                     <div className="bg-card/60 backdrop-blur-sm rounded-2xl shadow-soft border border-border overflow-hidden">
-                        {/* Chat Header */}
                         <div className="bg-gradient-hero px-6 py-4 text-primary-foreground">
                             <h2 className="text-xl font-semibold">AI Roommate Profiling</h2>
-                            <p className="text-sm opacity-90">Building your compatibility DNA... </p>
+                            <p className="text-sm opacity-90">Let's find your perfect match...</p>
                         </div>
-
-                        {/* Messages Area */}
                         <div className="h-96 overflow-y-auto p-6 space-y-4">
-                            {messages.map((message) => (
+                            {messages.map((msg) => (
                                 <ChatBubble
-                                    key={message.id}
-                                    message={message.message}
-                                    isUser={message.isUser}
-                                    timestamp={message.timestamp}
+                                    key={msg.id}
+                                    message={msg.message}
+                                    isUser={msg.isUser}
+                                    timestamp={msg.timestamp}
                                 />
                             ))}
-                            
                             {isTyping && (
                                 <div className="flex justify-start">
                                     <div className="bg-card border border-border rounded-2xl px-4 py-3 shadow-card">
@@ -211,18 +194,15 @@ const OnboardingPage = () => {
                                     </div>
                                 </div>
                             )}
-                            
                             <div ref={messagesEndRef} />
                         </div>
-
-                        {/* Input Area */}
                         <div className="border-t border-border p-4">
                             <div className="flex gap-3">
                                 <Input
                                     value={currentInput}
                                     onChange={(e) => setCurrentInput(e.target.value)}
                                     onKeyPress={handleKeyPress}
-                                    placeholder="Type your response..."
+                                    placeholder="Tell me about your preferences..."
                                     className="flex-1"
                                     disabled={isTyping}
                                 />

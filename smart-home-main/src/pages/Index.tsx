@@ -14,15 +14,15 @@ const Index = () => {
   const { isSignedIn } = useUser();
 
   const handleCTAClick = (type: 'find' | 'list') => {
-    
-      // Both 'find' and 'list' users now navigate to onboarding
-      // with their respective types if already signed in.
+    if (isSignedIn) {
       if (type === 'find') {
-        window.location.href = `/onboarding?type=seeker`; // Explicitly set seeker for 'find'
+        window.location.href = `/onboarding?type=find`;
       } else {
-        window.location.href = `/onboarding?type=lister`; // Explicitly set lister for 'list'
+        navigate('/create-listing');
       }
-     
+    } else {
+      setIsModalOpen(true);
+    }
   };
 
   const handleUserTypeSelect = (userType: 'seeker' | 'lister') => {
@@ -36,7 +36,7 @@ const Index = () => {
       <HeroSection onCTAClick={handleCTAClick} />
       <HowItWorksSection />
       <FeaturesSection />
-
+      
       <UserTypeModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
