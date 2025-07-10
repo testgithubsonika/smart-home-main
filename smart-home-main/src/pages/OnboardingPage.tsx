@@ -213,7 +213,7 @@ const OnboardingPage = () => {
                         {/* Chat Header */}
                         <div className="bg-gradient-hero px-6 py-4 text-primary-foreground">
                             <h2 className="text-xl font-semibold">AI Roommate Profiling</h2>
-                            <p className="text-sm opacity-90">Building your compatibility DNA... (Question {questionCount + 1} of 7)</p>
+                            <p className="text-sm opacity-90">Building your compatibility DNA... </p>
                         </div>
 
                         {/* Messages Area */}
