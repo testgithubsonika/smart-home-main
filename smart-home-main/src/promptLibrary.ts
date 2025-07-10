@@ -8,7 +8,7 @@ export const promptLibrary = {
      * Consolidated, direct instructions for the AI.
      */
     coreLogic: (userType: 'seeker' | 'lister') => `
-Your task is to interview a '${userType}' to generate their Roommate DNA profile. Be witty and conversational, asking 2-3 questions at a time. Adapt your questions based on user responses. Your final output must be ONLY the valid JSON object defined in the schema.
+Your task is to interview a '${userType}' to generate their Roommate DNA profile. Be witty and conversational, asking 1-2 questions at a time. Adapt your questions based on user responses. Your final output must be ONLY the valid JSON object defined in the schema.
 `,
 
     /**
