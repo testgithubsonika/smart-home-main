@@ -36,6 +36,23 @@ const OnboardingPage = () => {
         scrollToBottom();
     }, [messages]);
 
+    // Effect to handle navigation after the final message is shown
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage && lastMessage.message.startsWith("Perfect!")) {
+            const timer = setTimeout(() => {
+                if (userType === 'seeker') {
+                    navigate('/dashboard');
+                } else {
+                    navigate('/create-listing');
+                }
+            }, 2500);
+
+            return () => clearTimeout(timer); // Cleanup the timer
+        }
+    }, [messages, navigate, userType]);
+
+
     useEffect(() => {
         const initChat = async () => {
             if (!API_KEY) {
@@ -51,7 +68,7 @@ const OnboardingPage = () => {
             }
 
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
             const systemPrompt = createSystemPrompt(userType);
 
             const chatInstance = model.startChat({
@@ -95,8 +112,10 @@ const OnboardingPage = () => {
         };
 
         setMessages(prev => [...prev, userMessage]);
+        const messageInput = currentInput; // Store currentInput before clearing it
         setCurrentInput("");
         setIsTyping(true);
+
 
         const nextMessageCount = messageCount + 1;
         setMessageCount(nextMessageCount);
@@ -109,21 +128,12 @@ const OnboardingPage = () => {
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
             setMessages(prev => [...prev, finalMessage]);
-
-            setTimeout(() => {
-                if (userType === 'seeker') {
-                    navigate('/dashboard');
-                } else {
-                    navigate('/create-listing');
-                }
-            }, 2500);
-
-            setIsTyping(false);
+            setIsTyping(false); // Stop typing indicator for the final message
             return;
         }
 
         try {
-            const result = await chat.sendMessage(currentInput);
+            const result = await chat.sendMessage(messageInput);
             const response = result.response;
             const text = response.text();
 
