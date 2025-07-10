@@ -74,16 +74,16 @@ const OnboardingPage = () => {
             }
 
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Updated model for efficiency
 
-            // *** Use the dynamic prompt from the library ***
+            // Use the dynamic prompt from the library
             const systemPrompt = createSystemPrompt(userType);
 
             const chatInstance = model.startChat({
                 history: [{ role: "user", parts: [{ text: systemPrompt }] }],
                 generationConfig: {
-                    maxOutputTokens: 800, // Increased token limit for potentially larger JSON
-                    temperature: 0.7,   // A bit more creative for a conversational feel
+                    maxOutputTokens: 800,
+                    temperature: 0.7,
                 },
             });
 
@@ -106,7 +106,7 @@ const OnboardingPage = () => {
         };
 
         initChat();
-    }, [userType]); // Rerun if userType changes
+    }, [userType]);
 
     const handleSendMessage = async () => {
         if (!currentInput.trim() || !chat) return;
@@ -121,23 +121,31 @@ const OnboardingPage = () => {
         setMessages(prev => [...prev, userMessage]);
         setCurrentInput("");
         setIsTyping(true);
-        setQuestionCount(prev => prev + 1);
-
+        
         try {
             let promptToSend = currentInput;
-            if (questionCount >= 4) { // On the 5th user message, force the summary
+            
+            // MODIFIED LOGIC: Check if questionCount is 3. 
+            // On the 4th user message, the count (0, 1, 2, 3) will be 3, triggering the final summary.
+            if (questionCount >= 3) { 
                 promptToSend = `This is the final piece of information. Please generate the complete user profile JSON based on our entire conversation. Ensure all fields in the UserProfile are filled.`;
             }
+
             const result = await chat.sendMessage(promptToSend);
             const response = result.response;
             let text = response.text();
+
+            // Increment the count for the next interaction (if any).
+            setQuestionCount(prev => prev + 1);
 
             try {
                 const jsonString = text.replace(/```json|```/g, '').trim();
                 const responseObject = JSON.parse(jsonString);
 
-                if (responseObject.isComplete && responseObject.userProfile) {
-                    const profile: UserProfile = responseObject.userProfile;
+                // Assuming the final response will be a specific JSON structure.
+                // You might need to adjust this check based on your prompt instructions.
+                if (responseObject.userProfile) { 
+                    const profile: UserProfile = { userType, ...responseObject.userProfile };
                     localStorage.setItem('userProfile', JSON.stringify(profile));
 
                     const finalMessage: ChatMessage = {
@@ -157,7 +165,7 @@ const OnboardingPage = () => {
                     }, 2000);
 
                     setIsTyping(false);
-                    return;
+                    return; // Stop processing since we are done
                 }
             } catch (e) {
                 // Not a JSON object, treat as a regular message

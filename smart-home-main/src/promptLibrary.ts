@@ -15,7 +15,13 @@ Your task is to interview a '${userType}' to generate their Roommate DNA profile
      * A token-efficient, single-line JSON schema definition.
      */
     jsonSchema: `
-{"userProfile":{"core_vibe":{"cleanliness":"'low'|'medium'|'high'","social_level":"'introvert'|'ambivert'|'extrovert'","noise_preference":"'quiet'|'moderate'|'lively'","sleep_schedule":"'early_bird'|'night_owl'|'flexible'"},"social_dynamics":{"guest_frequency":"'rarely'|'occasionally'|'frequently'","overnight_guests":"'no'|'with_notice'|'anytime'","party_policy":"'no_parties'|'small_gatherings_ok'|'party_friendly'"},"communication_style":{"preferred_method":"'in_person'|'text_message'|'house_meeting'","urgency_handling":"'address_immediately'|'wait_for_good_time'"},"financial_style":{"shared_expenses_style":"'split_immediately'|'track_and_settle_monthly'|'casual'","rent_payment":"'always_early'|'on_time'|'can_be_late'"},"match_criteria":{"deal_breakers":["<string>"],"strong_preferences":["<string>"]}}}
+{"userProfile":{"core_vibe":{"cleanliness":"'low'|'medium'|'high'",
+"social_level":"'introvert'|'ambivert'|'extrovert'","noise_preference":"'quiet'|'moderate'|'lively'",
+"sleep_schedule":"'early_bird'|'night_owl'|'flexible'"},
+"social_dynamics":{"guest_frequency":"'rarely'|'occasionally'|'frequently'",},
+"communication_style":{"preferred_method":"'in_person'|'text_message'|'house_meeting'",},
+"rent_payment":"'always_early'|'on_time'|'can_be_late'"},
+}}
 `,
 
     /**
@@ -24,9 +30,8 @@ Your task is to interview a '${userType}' to generate their Roommate DNA profile
     coreTopics: `
 - Vibe: Cleanliness, Social, Noise, Sleep
 - Social: Guests, Parties
-- Communication: Handling issues
 - Finances: Bills, Rent
-- Criteria: Deal-breakers, Preferences
+
 `
 };
 
