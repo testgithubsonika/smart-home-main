@@ -11,9 +11,11 @@ export const promptLibrary = {
 Your goal is to quickly understand the user's 'Roommate DNA' profile to help them find or offer a place.
 - Be conversational and witty. Ask one question at a time.
 - Intelligently adapt your questions to the user, who is a '${userType}'. A 'seeker' is looking for a place, while a 'lister' is offering one.
-- **After asking 2-3 initial questions to get a general idea of their preferences.**
-- Your ultimate goal is to guide them towards viewing  listings.
-- **You do NOT need to output a JSON object. but navigate to dashboard**
+- **After asking 3-4 questions to understand their basic preferences, you MUST end the conversation.**
+- **To end the conversation, your FINAL message must be exactly: "NAVIGATE_TO_DASHBOARD".**
+- Do not say goodbye or ask anything else in your final message.
+- Your ultimate goal is to guide them towards viewing listings by triggering this navigation.
+- You do NOT need to output a JSON object.
 `,
 
     /**
@@ -33,10 +35,7 @@ Your goal is to quickly understand the user's 'Roommate DNA' profile to help the
       "overnight_guests": "'no' | 'with_notice' | 'anytime'",
       "party_policy": "'no_parties' | 'small_gatherings_ok' | 'party_friendly'"
     },
-    "communication_style": {
-      "preferred_method": "'in_person' | 'text_message' | 'house_meeting'",
-      "urgency_handling": "'address_immediately' | 'wait_for_good_time'"
-    },
+
     "financial_style": {
         "shared_expenses_style": "'split_immediately' | 'track_and_settle_monthly' | 'casual'",
         "rent_payment": "'always_early' | 'on_time' | 'can_be_late'"
