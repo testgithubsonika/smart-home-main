@@ -1,3 +1,5 @@
+// src/lib/prompt-config.ts
+
 export const promptLibrary = {
     /**
      * A concise, action-oriented persona for the AI.
@@ -20,6 +22,7 @@ Your goal is to quickly understand the user's 'Roommate DNA' profile to help the
 
     /**
      * This schema is no longer for direct output but serves as a guide for the *type* of information to collect briefly.
+     * The AI uses this internally to understand what kind of data points to probe for.
      */
     jsonSchema: `
 {

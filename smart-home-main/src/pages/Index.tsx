@@ -15,10 +15,25 @@ const Index = () => {
 
   const handleCTAClick = (type: 'find' | 'list') => {
     if (isSignedIn) {
+      // Check if user already has a profile
+      const existingProfile = localStorage.getItem('userProfile');
+      
       if (type === 'find') {
-        navigate('/dashboard');
+        if (existingProfile) {
+          // User has completed onboarding, go to dashboard
+          navigate('/dashboard');
+        } else {
+          // New user, go to onboarding first
+          navigate('/onboarding?type=seeker');
+        }
       } else {
-        navigate('/create-listing');
+        if (existingProfile) {
+          // User has completed onboarding, go to create listing
+          navigate('/create-listing');
+        } else {
+          // New user, go to onboarding first
+          navigate('/onboarding?type=lister');
+        }
       }
     } else {
       setIsModalOpen(true);
@@ -27,7 +42,8 @@ const Index = () => {
 
   const handleUserTypeSelect = (userType: 'seeker' | 'lister') => {
     console.log('User selected:', userType);
-    window.location.href = `/onboarding?type=${userType}`;
+    // For non-signed-in users, use navigate instead of window.location.href
+    navigate(`/onboarding?type=${userType}`);
   };
 
   return (
