@@ -7,6 +7,7 @@ import { ChatBubble } from "@/components/ChatBubble";
 import { Send, ArrowLeft, Users, Home, Clock, Sparkles } from "lucide-react";
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
+// Ensure your API key is correctly set in your .env file
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 interface ChatMessage {
@@ -45,7 +46,7 @@ const OnboardingPage = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Initialize the chat with enhanced configuration
+  // Initialize the chat
   useEffect(() => {
     const initChat = async () => {
       if (!API_KEY) {
@@ -61,7 +62,7 @@ const OnboardingPage = () => {
       }
 
       const genAI = new GoogleGenerativeAI(API_KEY);
-      const model = genAI.getGenerativeModel({ 
+      const model = genAI.getGenerativeModel({
         model: "gemini-2.0-flash",
         safetySettings: [
           {
@@ -75,75 +76,61 @@ const OnboardingPage = () => {
         ],
       });
 
-      const seekerQuestions = `
-Ask these 5 questions ONE AT A TIME:
-1. "Rate cleanliness 1-5?"
-2. "Quiet space or social hub?"
-3. "Early bird or night owl?"
-4. "Monthly budget?"
-5. "Any deal breakers?"
+      const seekerQuestions = `**Core Vibe**: Start by asking about their ideal home environment (cleanliness in scale of 1-5, social atmosphere, noise tolerence).
+      - **Lifestyle**: Inquire about their daily routine (sleep schedule, work-from-home, cooking habits).
+      - **Social Life**: Ask how they approach having guests, parties, and overnight stays.
+      - **Deal-Breakers**: End by asking for their absolute 'must-haves' and 'can't-stands' in a living situation.
+      - **Budget**: Ask for a rough estimate of their budget for a one-month stay.
+      - **Requirements**: Finally, ask for any specific requirements or preferences they have for the space, such as pets, smoking, or specific amenities.`;
 
-Keep it SHORT - max 5 words per question.`;
+      const listerQuestions = `**Core Vibe**: Ask them to describe the *current* vibe of their home (cleanliness, social life, noise).
+      - **Ideal Roommate**: Inquire about the kind of person who would fit best into the existing household (sleep schedule, lifestyle).
+      - **Household Harmony**: Ask how the current residents handle communication, disagreements, and shared finances.
+      - **The Non-Negotiables**: Ask what absolute 'deal-breakers' a potential applicant must meet.
+      - **Budget**: Ask for the expected budget range for a one-month stay.`;
+      
+      const systemPrompt = `
+You are Smart Roomie AI, a friendly and insightful AI assistan. Your goal is to onboard a new user by asking exactly 5 questions.
 
-      const listerQuestions = `
-Ask these 5 questions ONE AT A TIME:
-1. "Cleanliness level 1-5?"
-2. "Peaceful or social home?"
-3. "Early or late sleeper?"
-4. "Monthly rent amount?"
-5. "Key requirements?"
+**Your Persona:**
+- You are a friendly and insightful AI assistant .
+Your goal is to quickly understand the user's 'Roommate DNA' profile to help them find or offer a place.
+- Intelligently adapt your questions to the user, who is a '${userType}'. A 'seeker' is looking for a place, while a 'lister' is offering one.
+- **Be Honest and Realistic**: Don't make up answers or exaggerate. Be truthful and realistic.
 
-Keep it SHORT - max 5 words per question.`;
 
-      const systemPrompt = `You are Smart Roomie AI. Ask ONLY 5 quick questions for ${userType}.
+**STRICT RULES - NON-NEGOTIABLE:**
+1.  **ONE QUESTION AT A TIME:** Never ask more than one question in a single message.
+5.  **THE 6 QUESTION LIMIT:** After you receive the answer to the 5th and final question, your *only* response must be the completion JSON. Do not say anything else.
 
-STRICT RULES:
-- Ask ONE question at a time
-- Keep responses under 10 words
-- Be direct and casual
-- NO explanations
-- Use simple language
-
-QUESTIONS:
+**Question Script for a '${userType}':**
 ${userType === 'seeker' ? seekerQuestions : listerQuestions}
 
-RESPONSE STYLE:
-- Question only (no "Hi!" or introductions)
-- Acknowledge with "Got it!" then ask next
-- NO long sentences
-- NO paragraphs
-
-COMPLETION:
-After 5 answers, respond with this JSON only:
+**Completion Step:**
+After the 5th question is answered, you MUST respond with ONLY the following JSON structure, filling in the user's details. Do not include markdown formatting.
 {
   "isComplete": true,
   "userProfile": {
     "userType": "${userType}",
     "cleanliness": <number 1-5>,
-    "socialStyle": "<brief string>",
-    "sleepSchedule": "<brief string>",
-    "budget": "<string or null>",
+    "socialStyle": "<string >",
+    "sleepSchedule": "<string>",
+    "budget": "<string>",
     "requirements": "<string>"
   }
 }
 
-Start with question 1 now.`;
+Now, begin! Start with the very first question for the ${userType}.`;
 
+      // The generationConfig object has been removed from this call.
       const chatInstance = model.startChat({
         history: [{ role: "user", parts: [{ text: systemPrompt }] }],
-        generationConfig: {
-          maxOutputTokens: 80,  // Increased slightly for emojis and friendly tone
-          temperature: 0.4,     // Slightly more creative for engaging responses
-          topP: 0.6,           // More variety in word choices
-          topK: 15,            // More options for engaging language
-        },
       });
 
       setChat(chatInstance);
       setIsTyping(true);
 
-      // Get the initial message from the AI
-      const result = await chatInstance.sendMessage(`Hi! Let's make this fun! 😊 Start with question 1 for ${userType}.`);
+      const result = await chatInstance.sendMessage("Let's start!");
       const response = result.response;
       const text = response.text();
 
@@ -173,16 +160,14 @@ Start with question 1 now.`;
     setMessages(prev => [...prev, userMessage]);
     setCurrentInput("");
     setIsTyping(true);
+    
+    setProfileProgress(Math.min(((messages.length + 1) / 10) * 100, 99));
 
     try {
-      const result = await chat.sendMessage(currentInput + " (Keep it fun and under 12 words! 😊)");
+      const result = await chat.sendMessage(currentInput);
       const response = result.response;
       let text = response.text();
 
-      // Update progress based on message count (5 questions max)
-      setProfileProgress(Math.min((messages.length / 10) * 100, 90));
-
-      // Check if the response is a JSON object indicating completion
       try {
         const jsonString = text.replace(/```json|```/g, '').trim();
         const responseObject = JSON.parse(jsonString);
@@ -192,10 +177,9 @@ Start with question 1 now.`;
           localStorage.setItem('userProfile', JSON.stringify(profile));
           setProfileProgress(100);
 
-          // Add a final confirmation message before navigating
           const finalMessage: ChatMessage = {
             id: Date.now() + 1,
-            message: "🎉 Perfect! Your profile is ready! Taking you there now...",
+            message: "🎉 Awesome! Your profile is all set. Let's get you to the right place...",
             isUser: false,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           };
@@ -207,7 +191,7 @@ Start with question 1 now.`;
             } else {
               navigate('/create-listing');
             }
-          }, 1500);
+          }, 2000);
 
           setIsTyping(false);
           return;
@@ -228,7 +212,7 @@ Start with question 1 now.`;
       console.error("Error sending message to Gemini:", error);
       const errorMessage: ChatMessage = {
         id: Date.now() + 1,
-        message: "Oops! Connection hiccup 🔄 Try again?",
+        message: "Oops! My circuits got a little tangled. 😅 Could you try sending that again?",
         isUser: false,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
@@ -245,6 +229,7 @@ Start with question 1 now.`;
     }
   };
 
+  // ... The rest of your JSX remains the same
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <div className="container mx-auto px-6 py-8">
@@ -276,9 +261,9 @@ Start with question 1 now.`;
                   {userType === 'seeker' ? <Users className="w-5 h-5" /> : <Home className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold">Smart Roomie AI</h2>
+                  <h2 className="text-xl font-semibold">Chat with Smart Roomie</h2>
                   <p className="text-sm opacity-90">
-                    Quick 5 questions to build your profile
+                    Just 5 quick questions to build your profile!
                   </p>
                 </div>
               </div>
@@ -312,7 +297,7 @@ Start with question 1 now.`;
                         <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                         <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
-                      <span className="text-xs text-muted-foreground ml-2">Smart Roomie is thinking... 🤔</span>
+                      <span className="text-xs text-muted-foreground ml-2">Smart Roomie is typing...</span>
                     </div>
                   </div>
                 </div>
@@ -328,22 +313,21 @@ Start with question 1 now.`;
                   value={currentInput}
                   onChange={(e) => setCurrentInput(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Your answer..."
+                  placeholder="Type your answer here..."
                   className="flex-1"
-                  disabled={isTyping}
+                  disabled={isTyping || profileProgress >= 100}
                 />
                 <Button 
                   onClick={handleSendMessage}
-                  disabled={!currentInput.trim() || isTyping}
+                  disabled={!currentInput.trim() || isTyping || profileProgress >= 100}
                   className="shrink-0"
                 >
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
               
-              {/* Quick Tips */}
               <div className="mt-2 text-xs text-muted-foreground">
-                💡 Just 5 fun questions - be yourself! ✨
+                💡 Just be yourself! Your answers help us find the perfect match.
               </div>
             </div>
           </div>
