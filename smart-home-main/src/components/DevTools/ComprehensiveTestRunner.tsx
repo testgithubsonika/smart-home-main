@@ -10,7 +10,7 @@ import {
   AlertTriangle, 
   Loader2,
   Database,
-  Storage,
+  HardDrive,
   Brain,
   Globe,
   Code,
@@ -195,7 +195,7 @@ export const ComprehensiveTestRunner: React.FC = () => {
             {renderTestResults(
               results.firebase.storage, 
               'Firebase Storage', 
-              <Storage className="h-5 w-5" />
+              <HardDrive className="h-5 w-5" />
             )}
           </div>
 
