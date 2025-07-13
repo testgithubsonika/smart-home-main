@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ChatBubble } from "@/components/ChatBubble";
 import { Send, ArrowLeft, Users, Home, Clock, Sparkles } from "lucide-react";
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
 // Ensure your API key is correctly set in your .env file
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -26,6 +29,20 @@ interface UserProfile {
   requirements?: string;
 }
 
+interface CompletionResponse {
+  isComplete: boolean;
+  userProfile: UserProfile;
+}
+
+// Type for the Gemini chat instance
+interface GeminiChat {
+  sendMessage: (message: string) => Promise<{
+    response: {
+      text: () => string;
+    };
+  }>;
+}
+
 const OnboardingPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -33,8 +50,9 @@ const OnboardingPage = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentInput, setCurrentInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [chat, setChat] = useState<any>(null);
-  const [profileProgress, setProfileProgress] = useState(0);
+  const [chat, setChat] = useState<GeminiChat | null>(null);
+  const [questionsAsked, setQuestionsAsked] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -45,6 +63,36 @@ const OnboardingPage = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Calculate progress based on actual questions asked
+  const profileProgress = Math.min((questionsAsked / 5) * 100, 100);
+
+  // Validate completion JSON schema
+  const validateCompletionResponse = (obj: unknown): obj is CompletionResponse => {
+    if (!obj || typeof obj !== 'object') return false;
+    
+    const typedObj = obj as Record<string, unknown>;
+    
+    // Check isComplete
+    if (typedObj.isComplete !== true) return false;
+    
+    // Check userProfile exists and has required fields
+    if (!typedObj.userProfile || typeof typedObj.userProfile !== 'object') return false;
+    
+    const profile = typedObj.userProfile as Record<string, unknown>;
+    
+    // Validate required fields
+    if (profile.userType !== 'seeker' && profile.userType !== 'lister') return false;
+    if (typeof profile.cleanliness !== 'number' || profile.cleanliness < 1 || profile.cleanliness > 5) return false;
+    if (typeof profile.socialStyle !== 'string' || profile.socialStyle.trim() === '') return false;
+    if (typeof profile.sleepSchedule !== 'string' || profile.sleepSchedule.trim() === '') return false;
+    
+    // Optional fields can be undefined or string
+    if (profile.budget !== undefined && typeof profile.budget !== 'string') return false;
+    if (profile.requirements !== undefined && typeof profile.requirements !== 'string') return false;
+    
+    return true;
+  };
 
   // Initialize the chat
   useEffect(() => {
@@ -63,7 +111,7 @@ const OnboardingPage = () => {
 
       const genAI = new GoogleGenerativeAI(API_KEY);
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-flash",
         safetySettings: [
           {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -78,51 +126,57 @@ const OnboardingPage = () => {
 
       const seekerQuestions = `**Core Vibe**: Start by asking about their ideal home environment (cleanliness in scale of 1-5, social atmosphere, noise tolerence).
       - **Lifestyle**: Inquire about their daily routine (sleep schedule, work-from-home, cooking habits).
-      - **Social Life**: Ask how they approach having guests, parties, and overnight stays.
       - **Deal-Breakers**: End by asking for their absolute 'must-haves' and 'can't-stands' in a living situation.
       - **Budget**: Ask for a rough estimate of their budget for a one-month stay.
       - **Requirements**: Finally, ask for any specific requirements or preferences they have for the space, such as pets, smoking, or specific amenities.`;
 
       const listerQuestions = `**Core Vibe**: Ask them to describe the *current* vibe of their home (cleanliness, social life, noise).
-      - **Ideal Roommate**: Inquire about the kind of person who would fit best into the existing household (sleep schedule, lifestyle).
+      - **Ideal Roomie**: Inquire about the kind of person who would fit best into the existing household (sleep schedule, lifestyle).
       - **Household Harmony**: Ask how the current residents handle communication, disagreements, and shared finances.
       - **The Non-Negotiables**: Ask what absolute 'deal-breakers' a potential applicant must meet.
       - **Budget**: Ask for the expected budget range for a one-month stay.`;
       
       const systemPrompt = `
-You are Smart Roomie AI, a friendly and insightful AI assistan. Your goal is to onboard a new user by asking exactly 5 questions.
+You are Smart Roomie AI, a friendly and insightful AI assistant. Your goal is to onboard a new user by asking exactly 5 questions.
 
 **Your Persona:**
-- You are a friendly and insightful AI assistant .
-Your goal is to quickly understand the user's 'Roommate DNA' profile to help them find or offer a place.
+- You are a friendly and insightful AI assistant.
+- Your goal is to quickly understand the user's 'Roommate DNA' profile to help them find or offer a place.
 - Intelligently adapt your questions to the user, who is a '${userType}'. A 'seeker' is looking for a place, while a 'lister' is offering one.
 - **Be Honest and Realistic**: Don't make up answers or exaggerate. Be truthful and realistic.
 
-
 **STRICT RULES - NON-NEGOTIABLE:**
-1.  **ONE QUESTION AT A TIME:** Never ask more than one question in a single message.
-5.  **THE 6 QUESTION LIMIT:** After you receive the answer to the 5th and final question, your *only* response must be the completion JSON. Do not say anything else.
+1. **EXACTLY 5 QUESTIONS**: You must ask exactly 5 questions, no more, no less.
+2. **ONE QUESTION AT A TIME**: Never ask more than one question in a single message.
+3. **COUNT YOUR QUESTIONS**: Keep track internally. After the 5th question is answered, you MUST respond with the completion JSON.
+4. **NO EXTRA QUESTIONS**: Do not ask follow-up questions or clarification unless absolutely necessary.
 
 **Question Script for a '${userType}':**
 ${userType === 'seeker' ? seekerQuestions : listerQuestions}
 
 **Completion Step:**
-After the 5th question is answered, you MUST respond with ONLY the following JSON structure, filling in the user's details. Do not include markdown formatting.
+After the 5th question is answered, you MUST respond with ONLY the following JSON structure, filling in the user's details. Do not include markdown formatting or any other text.
+
 {
   "isComplete": true,
   "userProfile": {
     "userType": "${userType}",
     "cleanliness": <number 1-5>,
-    "socialStyle": "<string >",
+    "socialStyle": "<string>",
     "sleepSchedule": "<string>",
     "budget": "<string>",
     "requirements": "<string>"
   }
 }
 
+**IMPORTANT**: 
+- cleanliness must be a number between 1-5
+- socialStyle and sleepSchedule are required strings
+- budget and requirements are optional strings
+- Do not include any text before or after the JSON
+
 Now, begin! Start with the very first question for the ${userType}.`;
 
-      // The generationConfig object has been removed from this call.
       const chatInstance = model.startChat({
         history: [{ role: "user", parts: [{ text: systemPrompt }] }],
       });
@@ -141,6 +195,7 @@ Now, begin! Start with the very first question for the ${userType}.`;
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages([initialMessage]);
+      setQuestionsAsked(1); // First question asked
       setIsTyping(false);
     };
 
@@ -148,7 +203,7 @@ Now, begin! Start with the very first question for the ${userType}.`;
   }, [userType]);
 
   const handleSendMessage = async () => {
-    if (!currentInput.trim() || !chat) return;
+    if (!currentInput.trim() || !chat || isComplete) return;
 
     const userMessage: ChatMessage = {
       id: Date.now(),
@@ -160,22 +215,24 @@ Now, begin! Start with the very first question for the ${userType}.`;
     setMessages(prev => [...prev, userMessage]);
     setCurrentInput("");
     setIsTyping(true);
-    
-    setProfileProgress(Math.min(((messages.length + 1) / 10) * 100, 99));
 
     try {
       const result = await chat.sendMessage(currentInput);
       const response = result.response;
-      let text = response.text();
+      const text = response.text();
 
+      // Try to parse as completion JSON
       try {
         const jsonString = text.replace(/```json|```/g, '').trim();
         const responseObject = JSON.parse(jsonString);
 
-        if (responseObject.isComplete && responseObject.userProfile) {
+        if (validateCompletionResponse(responseObject)) {
+          // Valid completion JSON
           const profile: UserProfile = responseObject.userProfile;
-          localStorage.setItem('userProfile', JSON.stringify(profile));
-          setProfileProgress(100);
+          
+          // Save to Firestore
+          await setDoc(doc(db, "users", "user123"), profile);
+          setIsComplete(true);
 
           const finalMessage: ChatMessage = {
             id: Date.now() + 1,
@@ -197,9 +254,10 @@ Now, begin! Start with the very first question for the ${userType}.`;
           return;
         }
       } catch (e) {
-        // Not a JSON object, treat as a regular message
+        // Not a valid JSON object, treat as a regular message
       }
 
+      // Regular AI response - increment question count
       const aiMessage: ChatMessage = {
         id: Date.now() + 1,
         message: text,
@@ -207,6 +265,52 @@ Now, begin! Start with the very first question for the ${userType}.`;
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Increment questions asked (but don't exceed 5)
+      const newQuestionCount = Math.min(questionsAsked + 1, 5);
+      setQuestionsAsked(newQuestionCount);
+      
+      // If we've reached 5 questions but didn't get completion JSON, force completion
+      if (newQuestionCount >= 5 && !isComplete) {
+        const fallbackMessage: ChatMessage = {
+          id: Date.now() + 2,
+          message: "I've asked all my questions! Let me create your profile based on your answers...",
+          isUser: false,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, fallbackMessage]);
+        
+        // Create a fallback profile and complete
+        setTimeout(async () => {
+          const fallbackProfile: UserProfile = {
+            userType,
+            cleanliness: 3, // Default middle value
+            socialStyle: "Balanced",
+            sleepSchedule: "Regular",
+            budget: "Flexible",
+            requirements: "None specified"
+          };
+          
+          await setDoc(doc(db, "users", "user123"), fallbackProfile);
+          setIsComplete(true);
+          
+          const finalMessage: ChatMessage = {
+            id: Date.now() + 3,
+            message: "🎉 Profile created! Let's get you to the right place...",
+            isUser: false,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+          setMessages(prev => [...prev, finalMessage]);
+          
+          setTimeout(() => {
+            if (fallbackProfile.userType === 'seeker') {
+              navigate('/dashboard');
+            } else {
+              navigate('/create-listing');
+            }
+          }, 2000);
+        }, 1500);
+      }
 
     } catch (error) {
       console.error("Error sending message to Gemini:", error);
@@ -229,7 +333,6 @@ Now, begin! Start with the very first question for the ${userType}.`;
     }
   };
 
-  // ... The rest of your JSX remains the same
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <div className="container mx-auto px-6 py-8">
@@ -247,7 +350,9 @@ Now, begin! Start with the very first question for the ${userType}.`;
           {/* Progress Indicator */}
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">Profile: {Math.round(profileProgress)}%</span>
+            <span className="text-sm font-medium">
+              Question {questionsAsked} of 5 ({Math.round(profileProgress)}%)
+            </span>
           </div>
         </div>
 
@@ -263,7 +368,7 @@ Now, begin! Start with the very first question for the ${userType}.`;
                 <div>
                   <h2 className="text-xl font-semibold">Chat with Smart Roomie</h2>
                   <p className="text-sm opacity-90">
-                    Just 5 quick questions to build your profile!
+                    {isComplete ? "Profile complete! Redirecting..." : `Question ${questionsAsked} of 5`}
                   </p>
                 </div>
               </div>
@@ -313,13 +418,13 @@ Now, begin! Start with the very first question for the ${userType}.`;
                   value={currentInput}
                   onChange={(e) => setCurrentInput(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Type your answer here..."
+                  placeholder={isComplete ? "Profile complete!" : "Type your answer here..."}
                   className="flex-1"
-                  disabled={isTyping || profileProgress >= 100}
+                  disabled={isTyping || isComplete}
                 />
                 <Button 
                   onClick={handleSendMessage}
-                  disabled={!currentInput.trim() || isTyping || profileProgress >= 100}
+                  disabled={!currentInput.trim() || isTyping || isComplete}
                   className="shrink-0"
                 >
                   <Send className="w-4 h-4" />
@@ -327,7 +432,11 @@ Now, begin! Start with the very first question for the ${userType}.`;
               </div>
               
               <div className="mt-2 text-xs text-muted-foreground">
-                💡 Just be yourself! Your answers help us find the perfect match.
+                {isComplete ? (
+                  "🎉 Redirecting you to the next step..."
+                ) : (
+                  `💡 Just be yourself! Question ${questionsAsked} of 5.`
+                )}
               </div>
             </div>
           </div>

@@ -3,7 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Home, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, SignInButton, SignUpButton } from "@clerk/clerk-react";
+import { CustomUserButton } from "./CustomUserButton";
 
 export const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -50,7 +51,7 @@ export const Navigation = () => {
               </SignUpButton>
             </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl="/" />
+              <CustomUserButton />
             </SignedIn>
           </div>
 
@@ -89,7 +90,7 @@ export const Navigation = () => {
                   </SignUpButton>
                 </SignedOut>
                 <SignedIn>
-                  <UserButton afterSignOutUrl="/" />
+                  <CustomUserButton />
                 </SignedIn>
               </div>
             </div>

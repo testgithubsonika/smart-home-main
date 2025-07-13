@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/Navigation";
 import { HeroSection } from "@/components/HeroSection";
@@ -13,13 +15,24 @@ const Index = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { isSignedIn } = useUser();
 
-  const handleCTAClick = (type: 'find' | 'list') => {
+  const checkUserProfile = async (userId: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, "users", userId));
+      return userDoc.exists();
+    } catch (error) {
+      console.error("Error checking user profile:", error);
+      return false;
+    }
+  };
+
+  const handleCTAClick = async (type: 'find' | 'list') => {
     if (isSignedIn) {
       // Check if user already has a profile
-      const existingProfile = localStorage.getItem('userProfile');
+      const userId = "user123"; // Replace with actual user ID from auth
+      const hasProfile = await checkUserProfile(userId);
       
       if (type === 'find') {
-        if (existingProfile) {
+        if (hasProfile) {
           // User has completed onboarding, go to dashboard
           navigate('/dashboard');
         } else {
@@ -27,7 +40,7 @@ const Index = () => {
           navigate('/onboarding?type=seeker');
         }
       } else {
-        if (existingProfile) {
+        if (hasProfile) {
           // User has completed onboarding, go to create listing
           navigate('/create-listing');
         } else {

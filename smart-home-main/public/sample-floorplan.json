@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "version": 4.5,
+    "type": "Object",
+    "generator": "FloorPlanGenerator"
+  },
+  "geometries": [
+    {
+      "uuid": "room-geometry",
+      "type": "BoxGeometry",
+      "width": 4,
+      "height": 0.1,
+      "depth": 3
+    },
+    {
+      "uuid": "wall-geometry",
+      "type": "BoxGeometry",
+      "width": 0.1,
+      "height": 2.5,
+      "depth": 3
+    }
+  ],
+  "materials": [
+    {
+      "uuid": "floor-material",
+      "type": "MeshBasicMaterial",
+      "color": 0x8B4513,
+      "transparent": false,
+      "opacity": 1
+    },
+    {
+      "uuid": "wall-material",
+      "type": "MeshBasicMaterial",
+      "color": 0xF5F5DC,
+      "transparent": false,
+      "opacity": 1
+    }
+  ],
+  "object": {
+    "uuid": "floor-plan",
+    "type": "Group",
+    "children": [
+      {
+        "uuid": "floor",
+        "type": "Mesh",
+        "geometry": "room-geometry",
+        "material": "floor-material",
+        "position": [0, -0.05, 0]
+      },
+      {
+        "uuid": "wall-north",
+        "type": "Mesh",
+        "geometry": "wall-geometry",
+        "material": "wall-material",
+        "position": [0, 1.2, -1.5]
+      },
+      {
+        "uuid": "wall-south",
+        "type": "Mesh",
+        "geometry": "wall-geometry",
+        "material": "wall-material",
+        "position": [0, 1.2, 1.5]
+      },
+      {
+        "uuid": "wall-east",
+        "type": "Mesh",
+        "geometry": "wall-geometry",
+        "material": "wall-material",
+        "position": [2, 1.2, 0],
+        "rotation": [0, 1.5708, 0]
+      },
+      {
+        "uuid": "wall-west",
+        "type": "Mesh",
+        "geometry": "wall-geometry",
+        "material": "wall-material",
+        "position": [-2, 1.2, 0],
+        "rotation": [0, 1.5708, 0]
+      }
+    ]
+  }
+} 

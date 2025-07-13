@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { doc, getDoc, getDocs, collection, query, where, addDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ListingCard } from "@/components/ListingCard";
@@ -37,85 +39,159 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [filteredListings, setFilteredListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true); // NEW: loading state
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [minRent, setMinRent] = useState('');
+  const [maxRent, setMaxRent] = useState('');
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Firestore functions
+  const getUserProfileFromFirestore = async (userId: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, "users", userId));
+      if (userDoc.exists()) {
+        return userDoc.data() as UserProfile;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting user profile:", error);
+      return null;
+    }
+  };
+
+  const getListingsFromFirestore = async (userId?: string) => {
+    try {
+      let listingsQuery;
+      if (userId) {
+        // Get user's own listings
+        listingsQuery = query(collection(db, "listings"), where("userId", "==", userId));
+      } else {
+        // Get all listings
+        listingsQuery = collection(db, "listings");
+      }
+      
+      const querySnapshot = await getDocs(listingsQuery);
+      const listings: Listing[] = [];
+      querySnapshot.forEach((doc) => {
+        listings.push({ id: doc.id, ...doc.data() } as Listing);
+      });
+      return listings;
+    } catch (error) {
+      console.error("Error getting listings:", error);
+      return [];
+    }
+  };
+
+  const seedDummyListings = async () => {
+    const dummyListings = [
+      {
+        title: 'Spacious Room in Sunny Apartment',
+        location: 'Williamsburg, Brooklyn',
+        rent: 1450,
+        isVerified: true,
+        listerName: 'Alex',
+        listerAge: 28,
+        userId: 'dummy1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        title: 'Cozy Bedroom near Downtown',
+        location: 'East Village, Manhattan',
+        rent: 1600,
+        isVerified: true,
+        listerName: 'Jessica',
+        listerAge: 25,
+        userId: 'dummy2',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        title: 'Modern Loft with a Great View',
+        location: 'DUMBO, Brooklyn',
+        rent: 1800,
+        isVerified: true,
+        listerName: 'Mike',
+        listerAge: 31,
+        userId: 'dummy3',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        title: 'Quiet and Bright Room in Queens',
+        location: 'Astoria, Queens',
+        rent: 1100,
+        isVerified: false,
+        listerName: 'Sarah',
+        listerAge: 29,
+        userId: 'dummy4',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        title: 'Artistic Space in Bushwick',
+        location: 'Bushwick, Brooklyn',
+        rent: 1250,
+        isVerified: true,
+        listerName: 'David',
+        listerAge: 27,
+        userId: 'dummy5',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    try {
+      for (const listing of dummyListings) {
+        await addDoc(collection(db, "listings"), listing);
+      }
+      console.log("Dummy listings seeded successfully");
+    } catch (error) {
+      console.error("Error seeding dummy listings:", error);
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
-    // Simulate async fetch (replace with your Gemini/API call if needed)
-    timeoutRef.current = setTimeout(() => {
-      // Seed with example data if no listings exist
-      const existingListings = localStorage.getItem('listings');
-      if (!existingListings || JSON.parse(existingListings).length === 0) {
-        const dummyListings = [
-          {
-            id: '101',
-            title: 'Spacious Room in Sunny Apartment',
-            location: 'Williamsburg, Brooklyn',
-            rent: 1450,
-            isVerified: true,
-            listerName: 'Alex',
-            listerAge: 28,
-          },
-          {
-            id: '102',
-            title: 'Cozy Bedroom near Downtown',
-            location: 'East Village, Manhattan',
-            rent: 1600,
-            isVerified: true,
-            listerName: 'Jessica',
-            listerAge: 25,
-          },
-          {
-            id: '103',
-            title: 'Modern Loft with a Great View',
-            location: 'DUMBO, Brooklyn',
-            rent: 1800,
-            isVerified: true,
-            listerName: 'Mike',
-            listerAge: 31,
-          },
-          {
-            id: '104',
-            title: 'Quiet and Bright Room in Queens',
-            location: 'Astoria, Queens',
-            rent: 1100,
-            isVerified: false,
-            listerName: 'Sarah',
-            listerAge: 29,
-          },
-          {
-            id: '105',
-            title: 'Artistic Space in Bushwick',
-            location: 'Bushwick, Brooklyn',
-            rent: 1250,
-            isVerified: true,
-            listerName: 'David',
-            listerAge: 27,
-          },
-        ];
-        localStorage.setItem('listings', JSON.stringify(dummyListings));
-      }
-
-      const profileData = localStorage.getItem('userProfile');
-      if (profileData) {
-        const profile = JSON.parse(profileData);
-        setUserProfile(profile);
-
-        const allListings = JSON.parse(localStorage.getItem('listings') || '[]');
+    
+    const loadData = async () => {
+      try {
+        // Get user profile from Firestore
+        const userId = "user123"; // Replace with actual user ID from auth
+        const profile = await getUserProfileFromFirestore(userId);
         
-        if (profile.userType === 'seeker') {
-          setListings(allListings);
+        if (profile) {
+          setUserProfile(profile);
+          
+          // Get listings based on user type
+          if (profile.userType === 'seeker') {
+            const allListings = await getListingsFromFirestore();
+            if (allListings.length === 0) {
+              // Seed dummy data if no listings exist
+              await seedDummyListings();
+              const seededListings = await getListingsFromFirestore();
+              setListings(seededListings);
+            } else {
+              setListings(allListings);
+            }
+          } else {
+            const myListings = await getListingsFromFirestore(userId);
+            setListings(myListings);
+          }
         } else {
-          const myListings = allListings.filter((l: any) => l.listerName === 'You');
-          setListings(myListings);
+          navigate('/onboarding?type=seeker');
         }
-
-      } else {
-        navigate('/onboarding?type=seeker');
+      } catch (error) {
+        console.error("Error loading dashboard data:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false); // Done loading
-    }, 1000); // Simulate 1s delay
+    };
+
+    loadData();
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -196,6 +272,41 @@ const DashboardPage = () => {
     return Math.round((matches / compatibilityFactors.length) * 100);
   };
 
+  // Simple filter logic
+  const applyFilters = () => {
+    let filtered = [...listings];
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(listing => 
+        listing.title.toLowerCase().includes(query) ||
+        listing.location.toLowerCase().includes(query) ||
+        listing.listerName.toLowerCase().includes(query)
+      );
+    }
+
+    // Rent range filter
+    if (minRent) {
+      filtered = filtered.filter(listing => listing.rent >= parseInt(minRent));
+    }
+    if (maxRent) {
+      filtered = filtered.filter(listing => listing.rent <= parseInt(maxRent));
+    }
+
+    // Verified filter
+    if (verifiedOnly) {
+      filtered = filtered.filter(listing => listing.isVerified);
+    }
+
+    setFilteredListings(filtered);
+  };
+
+  // Apply filters when criteria change
+  useEffect(() => {
+    applyFilters();
+  }, [listings, searchQuery, minRent, maxRent, verifiedOnly]);
+
   const images = [room1Image, room2Image, room3Image, room4Image, room5Image, room6Image, room7Image, room8Image]; // Add as many images as you want
 
   return (
@@ -236,14 +347,86 @@ const DashboardPage = () => {
             <input
               type="text"
               placeholder="Search by location, price, or amenities..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-card/60 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          <Button variant="outline" className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            className="flex items-center gap-2"
+            onClick={() => setShowFilters(!showFilters)}
+          >
             <Filter className="w-4 h-4" />
-            Filters
+            Filters {filteredListings.length !== listings.length && `(${filteredListings.length})`}
           </Button>
         </div>
+
+        {/* Simple Filter Panel */}
+        {showFilters && (
+          <div className="bg-card/60 backdrop-blur-sm rounded-xl p-6 mb-8 border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Filters</h3>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setMinRent('');
+                  setMaxRent('');
+                  setVerifiedOnly(false);
+                }}
+              >
+                Clear All
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Rent Range */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Rent Range</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    value={minRent}
+                    onChange={(e) => setMinRent(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    value={maxRent}
+                    onChange={(e) => setMaxRent(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background"
+                  />
+                </div>
+              </div>
+
+              {/* Verified Only */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Verified Only</label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={verifiedOnly}
+                    onChange={(e) => setVerifiedOnly(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span>Show verified listings only</span>
+                </label>
+              </div>
+
+              {/* Results Count */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Results</label>
+                <p className="text-sm text-muted-foreground">
+                  {filteredListings.length} of {listings.length} listings
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Profile Summary */}
         <div className="bg-card/60 backdrop-blur-sm rounded-xl p-6 mb-8 border border-border">
@@ -272,8 +455,8 @@ const DashboardPage = () => {
 
         {/* Listings Grid */}
         <div className="grid lg:grid-cols-2 gap-8">
-          {listings.length > 0 ? (
-            listings.map((listing, index) => (
+          {filteredListings.length > 0 ? (
+            filteredListings.map((listing, index) => (
               <ListingCard
                 key={listing.id}
                 id={listing.id}

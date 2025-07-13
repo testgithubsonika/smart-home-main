@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is a member of a household
+    function isHouseholdMember(householdId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/households/$(householdId)) &&
+        request.auth.uid in get(/databases/$(database)/documents/households/$(householdId)).data.members;
+    }
+
+    // Helper function to check if user is admin of a household
+    function isHouseholdAdmin(householdId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/households/$(householdId)) &&
+        request.auth.uid == get(/databases/$(database)/documents/households/$(householdId)).data.adminId;
+    }
+
+    // Users collection - users can read/write their own data
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Households collection - members can read, admins can write
+    match /households/{householdId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Rent Payments - household members can read, assigned user can update
+    match /rentPayments/{paymentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Rent Schedules - household members can read, admins can write
+    match /rentSchedules/{scheduleId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Bills - household members can read, assigned user or admin can update
+    match /bills/{billId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Chores - household members can read, assigned user or admin can update
+    match /chores/{choreId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Chore Completions - household members can read, assigned user can create
+    match /choreCompletions/{completionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Sensors - household members can read, admins can write
+    match /sensors/{sensorId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Sensor Events - household members can read, system can create
+    match /sensorEvents/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Nudges - household members can read their own, admins can create
+    match /nudges/{nudgeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Chat Messages - household members can read/write
+    match /chatMessages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Notifications - users can read their own
+    match /notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Household Settings - household members can read, admins can write
+    match /householdSettings/{settingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Floor Plans - public read, household members can write
+    match /floorPlans/{floorPlanId} {
+      allow read: if true; // Public read access
+      allow write: if isAuthenticated();
+    }
+
+    // Listings - public read, authenticated users can create
+    match /listings/{listingId} {
+      allow read: if true; // Public access
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Identity Verifications - users can read/write their own
+    match /identityVerifications/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Location Verifications - users can read/write their own
+    match /locationVerifications/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Test collection for development
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Development mode - allow all authenticated users (REMOVE IN PRODUCTION)
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+} 

@@ -1,0 +1,36 @@
+{
+  "listings": {
+    "listing1": {
+      "title": "Cozy Room in Bangalore",
+      "location": "Indiranagar",
+      "rent": 12000,
+      "description": "Clean, peaceful area near the metro.",
+      "createdAt": "2025-07-12T10:00:00Z",
+      "listerId": "user123",
+      "isVerified": true,
+      "floorPlanUrl": "https://firebasestorage.googleapis.com/..."
+    }
+  },
+  "userPresence": {
+    "user123": {
+      "room": "Bedroom",
+      "detectedBy": "BLE",
+      "timestamp": "2025-07-12T10:10:00Z"
+    }
+  },
+  "biometricSessions": {
+    "user123": {
+      "token": "abc123",
+      "verified": true,
+      "timestamp": "2025-07-12T10:20:00Z"
+    }
+  },
+  "floorPlans": {
+    "plan123": {
+      "userId": "user123",
+      "planName": "1BHK Flat",
+      "uploadedAt": "2025-07-12T10:30:00Z",
+      "fileUrl": "https://firebasestorage.googleapis.com/..."
+    }
+  }
+}
