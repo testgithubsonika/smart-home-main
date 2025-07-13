@@ -25,9 +25,19 @@ const App = () => {
 
   // Auto-setup database in development mode
   useEffect(() => {
+    let mounted = true;
+    
     if (shouldAutoSetup()) {
-      autoSetupDatabase();
+      autoSetupDatabase().catch(error => {
+        if (mounted) {
+          console.error('Auto-setup failed:', error);
+        }
+      });
     }
+    
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
