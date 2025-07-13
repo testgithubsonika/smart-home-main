@@ -8,14 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Camera, Mic, CheckCircle, User, Shield, MapPin } from "lucide-react";
+import { ArrowLeft, Camera, Mic, CheckCircle, User, Shield, MapPin, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import FloorPlanViewer from "@/components/FloorPlanViewer";
 import { IdentityCheck } from "@/components/IdentityCheck";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { saveVerificationResult } from "@/utils/firestoreHelpers";
 import { LocationVerifier, LocationVerificationData } from "@/components/LocationVerifier";
-import { Alert, AlertDescription, AlertTriangle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Listing {
   id?: string;
