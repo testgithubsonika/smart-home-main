@@ -1,24 +1,22 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-// REMOVE: import { checkVerificationStatus } from "@/utils/firestoreHelpers";
-import { supabase } from "@/lib/supabase";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Camera, Mic, CheckCircle, User, Shield, MapPin, AlertTriangle } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import FloorPlanViewer from "@/components/FloorPlanViewer";
-import { IdentityCheck } from "@/components/IdentityCheck";
-import { VerificationBadge } from "@/components/VerificationBadge";
-// REMOVE: import { saveVerificationResult } from "@/utils/firestoreHelpers";
-import { LocationVerifier, LocationVerificationData } from "@/components/LocationVerifier";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/lib/supabase"; // Assuming this path is correct
+import { Button } from "@/components/ui/button"; // Assuming this path is correct
+import { Input } from "@/components/ui/input"; // Assuming this path is correct
+import { Textarea } from "@/components/ui/textarea"; // Assuming this path is correct
+import { Label } from "@/components/ui/label"; // Assuming this path is correct
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; // Assuming this path is correct
+import { ArrowLeft, Camera, Mic, CheckCircle, User, Shield, MapPin, AlertTriangle } from "lucide-react"; // Assuming lucide-react is installed
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Assuming this path is correct
+import FloorPlanViewer from "@/components/FloorPlanViewer"; // Assuming this path is correct
+import { IdentityCheck } from "@/components/IdentityCheck"; // Assuming this path is correct
+import { VerificationBadge } from "@/components/VerificationBadge"; // Assuming this path is correct
+import { LocationVerifier, LocationVerificationData } from "@/components/LocationVerifier"; // Assuming this path is correct
+import { Alert, AlertDescription } from "@/components/ui/alert"; // Assuming this path is correct
 
 // --- Supabase Helper Functions for Verification ---
-// You would typically put these in a separate utils/supabaseHelpers.ts file
-// For this fix, they are placed here to demonstrate the replacement.
+// These functions are placed here for demonstration. In a real application,
+// they would typically reside in a separate utility file (e.g., utils/supabaseHelpers.ts).
 
 /**
  * Checks the verification status of a user from Supabase.
@@ -88,8 +86,8 @@ interface Listing {
   isVerified: boolean;
   listerName: string;
   listerAge: number;
-  floorPlanUrl: string;
-  ambientNoiseDb?: number; // Added for ambient noise
+  floorPlanUrl?: string | null; // Made optional and can be null
+  ambientNoiseDb?: number | null; // Added for ambient noise, now optional
   faceDescriptor?: Float32Array; // Added for face verification
   locationVerification?: LocationVerificationData; // Added for location verification
   createdAt?: Date;
@@ -110,7 +108,7 @@ const CreateListingPage = () => {
   const [currentAudioLevel, setCurrentAudioLevel] = useState(0); // Current level for visualization
   const [measuredNoiseDb, setMeasuredNoiseDb] = useState<number | null>(null); // Final dB value
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [floorPlanUrl, setFloorPlanUrl] = useState<string>("/sample-floorplan.json");
+  const [floorPlanUrl, setFloorPlanUrl] = useState<string | null>(null); // Initialized as null
   const [faceDescriptor, setFaceDescriptor] = useState<Float32Array | null>(null);
   const [currentUserId] = useState("user-id-from-auth"); // Replace with Clerk/Firebase auth
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
@@ -121,12 +119,12 @@ const CreateListingPage = () => {
   // Check verification status on component mount
   useEffect(() => {
     const checkStatus = async () => {
-      // USE SUPABASE HELPER HERE
       const verified = await checkVerificationStatusSupabase(currentUserId);
       setIsIdentityVerified(verified);
     };
     checkStatus();
   }, [currentUserId]);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null); // To store FFT data
@@ -179,7 +177,7 @@ const CreateListingPage = () => {
     }
   };
 
-  const handleFloorPlanUpdate = (url: string) => {
+  const handleFloorPlanUpdate = (url: string | null) => { // Allow null for floor plan URL
     setFloorPlanUrl(url);
     console.log('Floor plan updated:', url);
   };
@@ -191,13 +189,7 @@ const CreateListingPage = () => {
       return;
     }
 
-    if (measuredNoiseDb === null) {
-      alert("Please complete the 30-second ambient noise sample before publishing.");
-      return;
-    }
-
     // Check identity verification
-    // USE SUPABASE HELPER HERE
     const verified = await checkVerificationStatusSupabase(currentUserId);
     if (!verified) {
       alert("Identity not verified. Please complete identity check.");
@@ -219,8 +211,8 @@ const CreateListingPage = () => {
         isVerified: true, // Assuming verification for now
         listerName: "You", // Placeholder
         listerAge: 25, // Placeholder
-        floorPlanUrl,
-        ambientNoiseDb: measuredNoiseDb, // Save the measured dB value
+        floorPlanUrl: floorPlanUrl, // Now can be null
+        ambientNoiseDb: measuredNoiseDb, // Save the measured dB value (can be null)
         faceDescriptor: faceDescriptor, // Save the face descriptor
         locationVerification: locationVerification, // Save the location verification data
       };
@@ -271,7 +263,6 @@ const CreateListingPage = () => {
   };
 
 
-
   const handleNoiseSample = async () => {
     setMediaError(null);
     setMeasuredNoiseDb(null); // Reset previous measurement
@@ -299,19 +290,19 @@ const CreateListingPage = () => {
     } else {
       // Start the stream
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
+        const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: false,
             noiseSuppression: false,
             autoGainControl: false
-          } 
+          }
         });
         setAudioStream(stream);
 
         // Create audio context
         const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
         audioContextRef.current = audioContext;
-        
+
         // Resume audio context if suspended
         if (audioContext.state === 'suspended') {
           await audioContext.resume();
@@ -412,11 +403,11 @@ const CreateListingPage = () => {
   const startAudioAnalysis = (analyser: AnalyserNode, dataArray: Uint8Array) => {
     const animate = () => {
       analyser.getByteFrequencyData(dataArray);
-      
+
       // Calculate RMS (Root Mean Square) for better loudness estimation
       let sumOfSquares = 0;
       let validSamples = 0;
-      
+
       for (let i = 0; i < dataArray.length; i++) {
         const value = dataArray[i] / 255.0; // Normalize to 0-1
         if (value > 0.01) { // Only count non-silent samples
@@ -424,7 +415,7 @@ const CreateListingPage = () => {
           validSamples++;
         }
       }
-      
+
       const rms = validSamples > 0 ? Math.sqrt(sumOfSquares / validSamples) : 0;
 
       // Convert RMS to dB (using 1.0 as reference for 0dBFS)
@@ -501,13 +492,13 @@ const CreateListingPage = () => {
                 <Label htmlFor="description">Description</Label>
                 <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the room, apartment, and ideal roommate..." rows={5} />
               </div>
-              
+
               {/* Floor Plan Viewer */}
               <div>
-                <Label>Floor Plan</Label>
+                <Label>Floor Plan (Optional)</Label> {/* Changed label to indicate optional */}
                 <div className="mt-2">
-                  <FloorPlanViewer 
-                    floorPlanUrl={floorPlanUrl}
+                  <FloorPlanViewer
+                    floorPlanUrl={floorPlanUrl} // Can now be null
                     householdId="temp-household-id" // Replace with actual household ID
                     userId={currentUserId}
                     onFloorPlanUpdate={handleFloorPlanUpdate}
@@ -516,6 +507,8 @@ const CreateListingPage = () => {
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   Interactive 3D floor plan viewer. Upload your floor plan or capture it with your camera to help potential roommates visualize the space.
+                  <br/>
+                  This step is **optional**. Listings without a floor plan will still be published.
                 </p>
               </div>
             </div>
@@ -552,7 +545,6 @@ const CreateListingPage = () => {
                 )}
 
 
-
                 {/* Noise Sample Info & Button */}
                 <div className="w-full flex flex-col items-center gap-2">
                   <TooltipProvider>
@@ -567,6 +559,8 @@ const CreateListingPage = () => {
                           We'll take a 30-second snapshot of your room's ambient noise to provide potential roommates with objective information.
                           <strong>Only the numerical noise level (in dB) is recorded and saved, not any audio recordings or conversations.</strong>
                           This helps us match you with seekers who prefer a specific noise environment (e.g., very quiet vs. lively).
+                          <br/><br/>
+                          This step is **optional** but highly recommended for better matches.
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -589,6 +583,11 @@ const CreateListingPage = () => {
                   {measuredNoiseDb !== null && !isNoiseSampling && (
                     <p className="text-sm text-green-600 mt-1">
                       Ambient Noise Measured: <strong>{measuredNoiseDb} dB</strong>. Ready for publishing!
+                    </p>
+                  )}
+                  {measuredNoiseDb === null && !isNoiseSampling && (
+                    <p className="text-sm text-yellow-600 mt-1">
+                      Ambient noise sample is optional. You can publish without it, but it's recommended!
                     </p>
                   )}
                 </div>
@@ -617,7 +616,7 @@ const CreateListingPage = () => {
                       </TooltipTrigger>
                       <TooltipContent className="max-w-sm text-sm">
                         <p>
-                          We verify that you are physically near the property you're listing using your device's location services. 
+                          We verify that you are physically near the property you're listing using your device's location services.
                           This helps ensure you have access to the property and builds trust with potential roommates.
                           <strong>Only approximate location is used for verification, not your exact address.</strong>
                         </p>
@@ -667,12 +666,12 @@ const CreateListingPage = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <IdentityCheck 
+                <IdentityCheck
                   currentUserId={currentUserId}
                   // You might need to update IdentityCheck to use the new Supabase helper
                   // If IdentityCheck internally calls saveVerificationResult, you'll need to pass
                   // saveVerificationResultSupabase as a prop or update IdentityCheck itself.
-                  onVerificationComplete={setIsIdentityVerified} 
+                  onVerificationComplete={setIsIdentityVerified}
                 />
               </CardContent>
             </Card>
