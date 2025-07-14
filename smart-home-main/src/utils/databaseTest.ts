@@ -1,9 +1,7 @@
-import { db, storage } from '@/lib/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { supabase } from '@/lib/supabase';
 
 export interface DatabaseTestResult {
-  firestore: {
+  supabase: {
     connected: boolean;
     canRead: boolean;
     canWrite: boolean;
@@ -32,53 +30,84 @@ export class DatabaseTester {
 
   public async testDatabase(): Promise<DatabaseTestResult> {
     const result: DatabaseTestResult = {
-      firestore: { connected: false, canRead: false, canWrite: false },
+      supabase: { connected: false, canRead: false, canWrite: false },
       storage: { connected: false, canUpload: false, canDownload: false },
       overall: 'failed'
     };
 
-    // Test Firestore
+    // Test Supabase Database
     try {
       // Test write
-      const testDoc = await addDoc(collection(db, 'test'), {
-        timestamp: new Date(),
-        test: true,
-        message: 'Database connectivity test'
-      });
-      result.firestore.canWrite = true;
+      const { data: insertData, error: insertError } = await supabase
+        .from('test_table')
+        .insert({
+          timestamp: new Date().toISOString(),
+          test: true,
+          message: 'Database connectivity test'
+        })
+        .select()
+        .single();
 
-      // Test read
-      const querySnapshot = await getDocs(collection(db, 'test'));
-      result.firestore.canRead = true;
+      if (insertError) {
+        // If test_table doesn't exist, try with households table
+        const { data: householdData, error: householdError } = await supabase
+          .from('households')
+          .select('count')
+          .limit(1);
 
-      // Clean up test document
-      await deleteDoc(doc(db, 'test', testDoc.id));
-      result.firestore.connected = true;
+        if (householdError) {
+          throw householdError;
+        }
+        result.supabase.canRead = true;
+        result.supabase.connected = true;
+      } else {
+        result.supabase.canWrite = true;
+        result.supabase.canRead = true;
+
+        // Clean up test data
+        await supabase
+          .from('test_table')
+          .delete()
+          .eq('id', insertData.id);
+
+        result.supabase.connected = true;
+      }
     } catch (error) {
-      result.firestore.error = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Firestore test failed:', error);
+      result.supabase.error = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Supabase test failed:', error);
     }
 
-    // Test Storage
+    // Test Supabase Storage
     try {
       // Create test file
       const testBlob = new Blob(['Database connectivity test'], { type: 'text/plain' });
       const testFile = new File([testBlob], 'test.txt', { type: 'text/plain' });
       
       // Test upload
-      const storageRef = ref(storage, 'test/test.txt');
-      const uploadSnapshot = await uploadBytes(storageRef, testFile);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('test')
+        .upload('test.txt', testFile);
+
+      if (uploadError) {
+        throw uploadError;
+      }
       result.storage.canUpload = true;
 
       // Test download
-      const downloadURL = await getDownloadURL(uploadSnapshot.ref);
-      const response = await fetch(downloadURL);
-      if (response.ok) {
-        result.storage.canDownload = true;
+      const { data: downloadData, error: downloadError } = await supabase.storage
+        .from('test')
+        .download('test.txt');
+
+      if (downloadError) {
+        throw downloadError;
       }
+      result.storage.canDownload = true;
 
       // Clean up test file
-      await deleteObject(storageRef);
+      await supabase.storage
+        .from('test')
+        .remove(['test.txt']);
+
       result.storage.connected = true;
     } catch (error) {
       result.storage.error = error instanceof Error ? error.message : 'Unknown error';
@@ -86,9 +115,9 @@ export class DatabaseTester {
     }
 
     // Determine overall status
-    if (result.firestore.connected && result.storage.connected) {
+    if (result.supabase.connected && result.storage.connected) {
       result.overall = 'working';
-    } else if (result.firestore.connected || result.storage.connected) {
+    } else if (result.supabase.connected || result.storage.connected) {
       result.overall = 'partial';
     } else {
       result.overall = 'failed';
@@ -97,47 +126,78 @@ export class DatabaseTester {
     return result;
   }
 
-  public async testSpecificCollections(): Promise<{
-    [collectionName: string]: { exists: boolean; canRead: boolean; canWrite: boolean; error?: string };
+  public async testSpecificTables(): Promise<{
+    [tableName: string]: { exists: boolean; canRead: boolean; canWrite: boolean; error?: string };
   }> {
-    const collections = [
+    const tables = [
       'households',
-      'floorPlans',
-      'listings',
-      'chores',
+      'rent_payments',
+      'rent_schedules',
       'bills',
+      'chores',
+      'chore_completions',
       'sensors',
+      'sensor_events',
+      'nudges',
+      'chat_messages',
+      'conflict_analyses',
+      'conflict_coach_sessions',
       'notifications',
-      'users'
+      'household_settings',
+      'location_verifications',
+      'webauthn_credentials'
     ];
 
     const results: { [key: string]: { exists: boolean; canRead: boolean; canWrite: boolean; error?: string } } = {};
 
-    for (const collectionName of collections) {
+    for (const tableName of tables) {
       try {
-        // Test if collection exists and can be read
-        const querySnapshot = await getDocs(collection(db, collectionName));
-        results[collectionName] = { exists: true, canRead: true, canWrite: false };
+        // Test if table exists and can be read
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .limit(1);
 
-        // Test write permission (only for test collections)
-        if (collectionName === 'test') {
-          try {
-            const testDoc = await addDoc(collection(db, collectionName), {
-              test: true,
-              timestamp: new Date()
-            });
-            await deleteDoc(doc(db, collectionName, testDoc.id));
-            results[collectionName].canWrite = true;
-          } catch (writeError) {
-            results[collectionName].error = writeError instanceof Error ? writeError.message : 'Write failed';
+        if (error) {
+          results[tableName] = {
+            exists: false,
+            canRead: false,
+            canWrite: false,
+            error: error.message
+          };
+        } else {
+          results[tableName] = { exists: true, canRead: true, canWrite: false };
+
+          // Test write permission (only for test tables)
+          if (tableName === 'test_table') {
+            try {
+              const { data: insertData, error: insertError } = await supabase
+                .from(tableName)
+                .insert({
+                  test: true,
+                  timestamp: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+              if (!insertError && insertData) {
+                await supabase
+                  .from(tableName)
+                  .delete()
+                  .eq('id', insertData.id);
+                results[tableName].canWrite = true;
+              }
+            } catch (writeError) {
+              results[tableName].error = writeError instanceof Error ? writeError.message : 'Write failed';
+            }
           }
         }
       } catch (error) {
-        results[collectionName] = {
+        results[tableName] = {
           exists: false,
           canRead: false,
           canWrite: false,
-          error: error instanceof Error ? error.message : 'Collection not accessible'
+          error: error instanceof Error ? error.message : 'Table not accessible'
         };
       }
     }
@@ -145,7 +205,7 @@ export class DatabaseTester {
     return results;
   }
 
-  public async testFloorPlanOperations(): Promise<{
+  public async testHouseholdOperations(): Promise<{
     canCreate: boolean;
     canRead: boolean;
     canUpdate: boolean;
@@ -161,41 +221,64 @@ export class DatabaseTester {
 
     try {
       // Test create
-      const testFloorPlan = {
-        householdId: 'test-household',
-        userId: 'test-user',
-        name: 'Test Floor Plan',
-        fileUrl: 'https://example.com/test.json',
-        createdAt: new Date(),
-        updatedAt: new Date()
+      const testHousehold = {
+        name: 'Test Harmony Household',
+        address: '123 Test Street, Test City, TC 12345',
+        rentAmount: 2500,
+        memberIds: ['test-user-123'],
+        adminId: 'test-user-123'
       };
 
-      const docRef = await addDoc(collection(db, 'floorPlans'), testFloorPlan);
+      const { data: insertData, error: insertError } = await supabase
+        .from('households')
+        .insert(testHousehold)
+        .select()
+        .single();
+
+      if (insertError) {
+        throw insertError;
+      }
       result.canCreate = true;
 
       // Test read
-      const docSnap = await getDocs(collection(db, 'floorPlans'));
+      const { data: readData, error: readError } = await supabase
+        .from('households')
+        .select('*')
+        .eq('id', insertData.id)
+        .single();
+
+      if (readError) {
+        throw readError;
+      }
       result.canRead = true;
 
       // Test update
-      await addDoc(collection(db, 'floorPlans'), {
-        ...testFloorPlan,
-        name: 'Updated Test Floor Plan'
-      });
+      const { data: updateData, error: updateError } = await supabase
+        .from('households')
+        .update({ name: 'Updated Test Household' })
+        .eq('id', insertData.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw updateError;
+      }
       result.canUpdate = true;
 
-      // Test delete (clean up test documents)
-      const testDocs = await getDocs(collection(db, 'floorPlans'));
-      const deletePromises = testDocs.docs
-        .filter(doc => doc.data().householdId === 'test-household')
-        .map(doc => deleteDoc(doc.ref));
-      
-      await Promise.all(deletePromises);
+      // Test delete (clean up test data)
+      const { error: deleteError } = await supabase
+        .from('households')
+        .delete()
+        .eq('id', insertData.id);
+
+      if (deleteError) {
+        throw deleteError;
+      }
       result.canDelete = true;
 
     } catch (error) {
-      result.error = error instanceof Error ? error.message : 'Floor plan operations failed';
-      console.error('Floor plan test failed:', error);
+      result.error = error instanceof Error ? error.message : 'Household operations failed';
+      console.error('Household test failed:', error);
     }
 
     return result;
@@ -215,22 +298,33 @@ export class DatabaseTester {
 
     try {
       // Test upload
-      const testBlob = new Blob(['Test floor plan data'], { type: 'application/json' });
-      const testFile = new File([testBlob], 'test-floorplan.json', { type: 'application/json' });
+      const testBlob = new Blob(['Test household data'], { type: 'application/json' });
+      const testFile = new File([testBlob], 'test-household.json', { type: 'application/json' });
       
-      const storageRef = ref(storage, 'test/test-floorplan.json');
-      const uploadSnapshot = await uploadBytes(storageRef, testFile);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('test')
+        .upload('test-household.json', testFile);
+
+      if (uploadError) {
+        throw uploadError;
+      }
       result.canUpload = true;
 
       // Test download
-      const downloadURL = await getDownloadURL(uploadSnapshot.ref);
-      const response = await fetch(downloadURL);
-      if (response.ok) {
-        result.canDownload = true;
+      const { data: downloadData, error: downloadError } = await supabase.storage
+        .from('test')
+        .download('test-household.json');
+
+      if (downloadError) {
+        throw downloadError;
       }
+      result.canDownload = true;
 
       // Test delete
-      await deleteObject(storageRef);
+      await supabase.storage
+        .from('test')
+        .remove(['test-household.json']);
+
       result.canDelete = true;
 
     } catch (error) {
@@ -243,41 +337,55 @@ export class DatabaseTester {
 
   public getDatabaseStatus(): Promise<{
     connected: boolean;
-    collections: string[];
+    tables: string[];
     error?: string;
   }> {
     return new Promise(async (resolve) => {
       try {
-        const collections = [
+        const tables = [
           'households',
-          'floorPlans',
-          'listings',
-          'chores',
+          'rent_payments',
+          'rent_schedules',
           'bills',
+          'chores',
+          'chore_completions',
           'sensors',
+          'sensor_events',
+          'nudges',
+          'chat_messages',
+          'conflict_analyses',
+          'conflict_coach_sessions',
           'notifications',
-          'users'
+          'household_settings',
+          'location_verifications',
+          'webauthn_credentials'
         ];
 
-        const accessibleCollections: string[] = [];
+        const accessibleTables: string[] = [];
 
-        for (const collectionName of collections) {
+        for (const tableName of tables) {
           try {
-            await getDocs(collection(db, collectionName));
-            accessibleCollections.push(collectionName);
+            const { error } = await supabase
+              .from(tableName)
+              .select('count')
+              .limit(1);
+            
+            if (!error) {
+              accessibleTables.push(tableName);
+            }
           } catch (error) {
-            console.warn(`Collection ${collectionName} not accessible:`, error);
+            console.warn(`Table ${tableName} not accessible:`, error);
           }
         }
 
         resolve({
-          connected: accessibleCollections.length > 0,
-          collections: accessibleCollections
+          connected: accessibleTables.length > 0,
+          tables: accessibleTables
         });
       } catch (error) {
         resolve({
           connected: false,
-          collections: [],
+          tables: [],
           error: error instanceof Error ? error.message : 'Database connection failed'
         });
       }
@@ -290,7 +398,7 @@ export const databaseTester = DatabaseTester.getInstance();
 
 // Convenience functions
 export const testDatabase = () => databaseTester.testDatabase();
-export const testCollections = () => databaseTester.testSpecificCollections();
-export const testFloorPlans = () => databaseTester.testFloorPlanOperations();
+export const testTables = () => databaseTester.testSpecificTables();
+export const testHouseholds = () => databaseTester.testHouseholdOperations();
 export const testStorage = () => databaseTester.testStorageOperations();
 export const getDatabaseStatus = () => databaseTester.getDatabaseStatus(); 

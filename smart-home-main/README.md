@@ -78,9 +78,31 @@ Follow these steps to set up and run the project locally.
 └── index.css		# Global styles and Tailwind CSS configuration
 ```
 
+## 🗄️ Database Migration
+
+This project has been migrated from Firebase Firestore to Supabase. See the [Supabase Migration Guide](./SUPABASE_MIGRATION_GUIDE.md) for detailed instructions.
+
+### Quick Setup
+
+1. **Set up Supabase project** at [supabase.com](https://supabase.com)
+2. **Run the database migration** using `supabase-migration.sql`
+3. **Update environment variables**:
+   ```env
+   VITE_SUPABASE_URL=your_supabase_project_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+4. **Test the connection**:
+   ```bash
+   node scripts/test-supabase.js
+   ```
+5. **Migrate existing data** (if needed):
+   ```bash
+   node scripts/migrate-to-supabase.js
+   ```
+
 ## 🔮 Future Work
 
-- Implement a real backend and database (e.g., Firebase, Supabase) to persist user data and listings.
 - Develop the "Harmony Hub" feature.
 - Expand the AI conversation to include more compatibility factors.
 - Add real-time chat between matched users.
+- Implement advanced analytics and reporting.

@@ -20,19 +20,21 @@ import {
 import { toast } from 'sonner';
 
 import { 
-  uploadSampleData, 
-  exportHouseholdData, 
-  clearHouseholdData, 
-  checkDatabaseConnection,
   createHousehold,
   getHousehold
-} from '@/services/firebaseServices';
+} from '@/services/harmonyService';
+import { 
+  checkDatabaseConnection,
+  uploadSampleData, 
+  exportHouseholdData, 
+  clearHouseholdData
+} from '@/services/supabaseServices';
 
 export const FirebaseDataManager: React.FC = () => {
   const [householdId, setHouseholdId] = useState('household-123');
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
-  const [exportedData, setExportedData] = useState<any>(null);
+  const [exportedData, setExportedData] = useState<Record<string, unknown> | null>(null);
 
   // Check database connection on component mount
   React.useEffect(() => {
@@ -154,9 +156,9 @@ export const FirebaseDataManager: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold">Firebase Data Manager</h2>
+        <h2 className="text-2xl font-bold">Supabase Data Manager</h2>
         <p className="text-muted-foreground">
-          Upload, export, and manage Firestore data for development and testing
+          Upload, export, and manage Supabase data for development and testing
         </p>
       </div>
 

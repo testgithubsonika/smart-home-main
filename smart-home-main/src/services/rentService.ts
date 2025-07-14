@@ -1,19 +1,4 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  serverTimestamp,
-  Timestamp 
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import {
   RentPayment,
   RentSchedule,
@@ -24,12 +9,23 @@ import {
 export class RentService {
   static async createRentPayment(payment: Omit<RentPayment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'rentPayments'), {
-        ...payment,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      return docRef.id;
+      const { data, error } = await supabase
+        .from('rent_payments')
+        .insert({
+          household_id: payment.householdId,
+          user_id: payment.userId,
+          amount: payment.amount,
+          due_date: payment.dueDate,
+          paid_date: payment.paidDate,
+          status: payment.status,
+          method: payment.method,
+          notes: payment.notes,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data.id;
     } catch (error) {
       console.error('Error creating rent payment:', error);
       throw new Error('Failed to create rent payment');
@@ -38,15 +34,15 @@ export class RentService {
 
   static async getRentPayments(householdId: string, limitCount: number = 50): Promise<RentPayment[]> {
     try {
-      const q = query(
-        collection(db, 'rentPayments'),
-        where('householdId', '==', householdId),
-        orderBy('dueDate', 'desc'),
-        limit(limitCount)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as RentPayment);
+      const { data, error } = await supabase
+        .from('rent_payments')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('due_date', { ascending: false })
+        .limit(limitCount);
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting rent payments:', error);
       return [];
@@ -55,11 +51,15 @@ export class RentService {
 
   static async updateRentPayment(paymentId: string, updates: Partial<RentPayment>): Promise<void> {
     try {
-      const docRef = doc(db, 'rentPayments', paymentId);
-      await updateDoc(docRef, {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      });
+      const { error } = await supabase
+        .from('rent_payments')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', paymentId);
+
+      if (error) throw error;
     } catch (error) {
       console.error('Error updating rent payment:', error);
       throw new Error('Failed to update rent payment');
@@ -68,8 +68,12 @@ export class RentService {
 
   static async deleteRentPayment(paymentId: string): Promise<void> {
     try {
-      const docRef = doc(db, 'rentPayments', paymentId);
-      await deleteDoc(docRef);
+      const { error } = await supabase
+        .from('rent_payments')
+        .delete()
+        .eq('id', paymentId);
+
+      if (error) throw error;
     } catch (error) {
       console.error('Error deleting rent payment:', error);
       throw new Error('Failed to delete rent payment');
@@ -78,12 +82,23 @@ export class RentService {
 
   static async createRentSchedule(schedule: Omit<RentSchedule, 'id'>): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'rentSchedules'), {
-        ...schedule,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      return docRef.id;
+      const { data, error } = await supabase
+        .from('rent_schedules')
+        .insert({
+          household_id: schedule.householdId,
+          monthly_amount: schedule.monthlyAmount,
+          due_day: schedule.dueDay,
+          split_type: schedule.splitType,
+          splits: schedule.splits,
+          start_date: schedule.startDate,
+          end_date: schedule.endDate,
+          is_active: schedule.isActive,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data.id;
     } catch (error) {
       console.error('Error creating rent schedule:', error);
       throw new Error('Failed to create rent schedule');
@@ -92,20 +107,16 @@ export class RentService {
 
   static async getRentSchedule(householdId: string): Promise<RentSchedule | null> {
     try {
-      const q = query(
-        collection(db, 'rentSchedules'),
-        where('householdId', '==', householdId),
-        where('isActive', '==', true),
-        limit(1)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      if (querySnapshot.empty) {
-        return null;
-      }
-      
-      const doc = querySnapshot.docs[0];
-      return { id: doc.id, ...doc.data() } as RentSchedule;
+      const { data, error } = await supabase
+        .from('rent_schedules')
+        .select('*')
+        .eq('household_id', householdId)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      if (error) return null;
+      return data;
     } catch (error) {
       console.error('Error getting rent schedule:', error);
       return null;
@@ -114,11 +125,15 @@ export class RentService {
 
   static async updateRentSchedule(scheduleId: string, updates: Partial<RentSchedule>): Promise<void> {
     try {
-      const docRef = doc(db, 'rentSchedules', scheduleId);
-      await updateDoc(docRef, {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      });
+      const { error } = await supabase
+        .from('rent_schedules')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', scheduleId);
+
+      if (error) throw error;
     } catch (error) {
       console.error('Error updating rent schedule:', error);
       throw new Error('Failed to update rent schedule');
@@ -127,13 +142,14 @@ export class RentService {
 
   static async getHousehold(householdId: string): Promise<Household | null> {
     try {
-      const docRef = doc(db, 'households', householdId);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as Household;
-      }
-      return null;
+      const { data, error } = await supabase
+        .from('households')
+        .select('*')
+        .eq('id', householdId)
+        .single();
+
+      if (error) return null;
+      return data;
     } catch (error) {
       console.error('Error getting household:', error);
       return null;
@@ -146,16 +162,16 @@ export class RentService {
       const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
 
-      const q = query(
-        collection(db, 'rentPayments'),
-        where('householdId', '==', householdId),
-        where('dueDate', '>=', startOfMonth),
-        where('dueDate', '<=', endOfMonth),
-        orderBy('dueDate', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as RentPayment);
+      const { data, error } = await supabase
+        .from('rent_payments')
+        .select('*')
+        .eq('household_id', householdId)
+        .gte('due_date', startOfMonth.toISOString())
+        .lte('due_date', endOfMonth.toISOString())
+        .order('due_date', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting current month payments:', error);
       return [];
@@ -164,17 +180,15 @@ export class RentService {
 
   static async getOverduePayments(householdId: string): Promise<RentPayment[]> {
     try {
-      const today = new Date();
-      
-      const q = query(
-        collection(db, 'rentPayments'),
-        where('householdId', '==', householdId),
-        where('status', '==', 'overdue'),
-        orderBy('dueDate', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as RentPayment);
+      const { data, error } = await supabase
+        .from('rent_payments')
+        .select('*')
+        .eq('household_id', householdId)
+        .eq('status', 'overdue')
+        .order('due_date', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting overdue payments:', error);
       return [];
@@ -183,13 +197,17 @@ export class RentService {
 
   static async markPaymentAsPaid(paymentId: string, userId: string, paidDate?: Date): Promise<void> {
     try {
-      const docRef = doc(db, 'rentPayments', paymentId);
-      await updateDoc(docRef, {
-        status: 'paid',
-        paidDate: paidDate || new Date(),
-        paidBy: userId,
-        updatedAt: serverTimestamp(),
-      });
+      const { error } = await supabase
+        .from('rent_payments')
+        .update({
+          status: 'paid',
+          paid_date: paidDate || new Date().toISOString(),
+          paid_by: userId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', paymentId);
+
+      if (error) throw error;
     } catch (error) {
       console.error('Error marking payment as paid:', error);
       throw new Error('Failed to mark payment as paid');

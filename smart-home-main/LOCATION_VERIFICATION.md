@@ -26,7 +26,7 @@ The location verification feature ensures that users creating property listings 
    - Allow user to confirm or retry
 
 4. **Data Storage**
-   - Store verification metadata in Firestore
+   - Store verification metadata in supabase
    - Include coordinates, accuracy, timestamp, and verification method
 
 ## 📁 File Structure

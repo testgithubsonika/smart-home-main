@@ -1,21 +1,4 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  onSnapshot,
-  Timestamp,
-  writeBatch,
-  serverTimestamp
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import {
   Household,
   RentPayment,
@@ -36,351 +19,472 @@ import {
 
 // Household Management
 export const createHousehold = async (household: Omit<Household, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'households'), {
-    ...household,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('households')
+    .insert({
+      ...household,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const getHousehold = async (householdId: string): Promise<Household | null> => {
-  const docRef = doc(db, 'households', householdId);
-  const docSnap = await getDoc(docRef);
-  
-  if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() } as Household;
-  }
-  return null;
+  const { data, error } = await supabase
+    .from('households')
+    .select('*')
+    .eq('id', householdId)
+    .single();
+
+  if (error) return null;
+  return data;
 };
 
 export const updateHousehold = async (householdId: string, updates: Partial<Household>): Promise<void> => {
-  const docRef = doc(db, 'households', householdId);
-  await updateDoc(docRef, {
-    ...updates,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('households')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', householdId);
+
+  if (error) throw error;
 };
 
 // Rent Management
 export const createRentPayment = async (payment: Omit<RentPayment, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'rentPayments'), {
-    ...payment,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('rent_payments')
+    .insert({
+      ...payment,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const getRentPayments = async (householdId: string): Promise<RentPayment[]> => {
-  const q = query(
-    collection(db, 'rentPayments'),
-    where('householdId', '==', householdId),
-    orderBy('dueDate', 'desc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as RentPayment);
+  const { data, error } = await supabase
+    .from('rent_payments')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('due_date', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 };
 
 export const updateRentPayment = async (paymentId: string, updates: Partial<RentPayment>): Promise<void> => {
-  const docRef = doc(db, 'rentPayments', paymentId);
-  await updateDoc(docRef, {
-    ...updates,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('rent_payments')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', paymentId);
+
+  if (error) throw error;
 };
 
 export const createRentSchedule = async (schedule: Omit<RentSchedule, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'rentSchedules'), {
-    ...schedule,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('rent_schedules')
+    .insert({
+      ...schedule,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 // Bills Management
 export const createBill = async (bill: Omit<Bill, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'bills'), {
-    ...bill,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('bills')
+    .insert({
+      ...bill,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const getBills = async (householdId: string): Promise<Bill[]> => {
-  const q = query(
-    collection(db, 'bills'),
-    where('householdId', '==', householdId),
-    orderBy('dueDate', 'desc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Bill);
+  const { data, error } = await supabase
+    .from('bills')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('due_date', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 };
 
 export const updateBill = async (billId: string, updates: Partial<Bill>): Promise<void> => {
-  const docRef = doc(db, 'bills', billId);
-  await updateDoc(docRef, {
-    ...updates,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('bills')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', billId);
+
+  if (error) throw error;
 };
 
 export const deleteBill = async (billId: string): Promise<void> => {
-  const docRef = doc(db, 'bills', billId);
-  await deleteDoc(docRef);
+  const { error } = await supabase
+    .from('bills')
+    .delete()
+    .eq('id', billId);
+
+  if (error) throw error;
 };
 
 // Chores Management
 export const createChore = async (chore: Omit<Chore, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'chores'), {
-    ...chore,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('chores')
+    .insert({
+      ...chore,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const getChores = async (householdId: string): Promise<Chore[]> => {
-  const q = query(
-    collection(db, 'chores'),
-    where('householdId', '==', householdId),
-    orderBy('createdAt', 'desc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Chore);
+  const { data, error } = await supabase
+    .from('chores')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 };
 
 export const updateChore = async (choreId: string, updates: Partial<Chore>): Promise<void> => {
-  const docRef = doc(db, 'chores', choreId);
-  await updateDoc(docRef, {
-    ...updates,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('chores')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', choreId);
+
+  if (error) throw error;
 };
 
 export const completeChore = async (choreId: string, completion: Omit<ChoreCompletion, 'id'>): Promise<string> => {
-  const batch = writeBatch(db);
-  
-  // Add completion record
-  const completionRef = doc(collection(db, 'choreCompletions'));
-  batch.set(completionRef, {
-    ...completion,
-    createdAt: serverTimestamp(),
-  });
-  
+  // Start a transaction
+  const { data: completionData, error: completionError } = await supabase
+    .from('chore_completions')
+    .insert({
+      ...completion,
+      created_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (completionError) throw completionError;
+
   // Update chore status
-  const choreRef = doc(db, 'chores', choreId);
-  batch.update(choreRef, {
-    status: 'completed',
-    completedDate: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  
-  await batch.commit();
-  return completionRef.id;
+  const { error: updateError } = await supabase
+    .from('chores')
+    .update({
+      status: 'completed',
+      completed_date: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', choreId);
+
+  if (updateError) throw updateError;
+
+  return completionData.id;
 };
 
 export const getChoreCompletions = async (householdId: string, days: number = 30): Promise<ChoreCompletion[]> => {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
-  
-  const q = query(
-    collection(db, 'choreCompletions'),
-    where('householdId', '==', householdId),
-    where('completedAt', '>=', cutoffDate),
-    orderBy('completedAt', 'desc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as ChoreCompletion);
+
+  const { data, error } = await supabase
+    .from('chore_completions')
+    .select('*')
+    .eq('household_id', householdId)
+    .gte('completed_at', cutoffDate.toISOString())
+    .order('completed_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 };
 
 // Sensor Management
 export const createSensor = async (sensor: Omit<Sensor, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'sensors'), {
-    ...sensor,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('sensors')
+    .insert({
+      ...sensor,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const getSensors = async (householdId: string): Promise<Sensor[]> => {
-  const q = query(
-    collection(db, 'sensors'),
-    where('householdId', '==', householdId),
-    where('isActive', '==', true)
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Sensor);
+  const { data, error } = await supabase
+    .from('sensors')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('is_active', true);
+
+  if (error) throw error;
+  return data || [];
 };
 
 export const recordSensorEvent = async (event: Omit<SensorEvent, 'id'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'sensorEvents'), {
-    ...event,
-    createdAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('sensor_events')
+    .insert({
+      ...event,
+      created_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const getSensorEvents = async (sensorId: string, hours: number = 24): Promise<SensorEvent[]> => {
   const cutoffDate = new Date();
   cutoffDate.setHours(cutoffDate.getHours() - hours);
-  
-  const q = query(
-    collection(db, 'sensorEvents'),
-    where('sensorId', '==', sensorId),
-    where('timestamp', '>=', cutoffDate),
-    orderBy('timestamp', 'desc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as SensorEvent);
+
+  const { data, error } = await supabase
+    .from('sensor_events')
+    .select('*')
+    .eq('sensor_id', sensorId)
+    .gte('timestamp', cutoffDate.toISOString())
+    .order('timestamp', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 };
 
 // Nudges Management
 export const createNudge = async (nudge: Omit<Nudge, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'nudges'), {
-    ...nudge,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('nudges')
+    .insert({
+      ...nudge,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const getNudges = async (householdId: string, userId?: string): Promise<Nudge[]> => {
-  let q = query(
-    collection(db, 'nudges'),
-    where('householdId', '==', householdId),
-    where('isDismissed', '==', false),
-    orderBy('createdAt', 'desc')
-  );
-  
+  let query = supabase
+    .from('nudges')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('is_dismissed', false)
+    .order('created_at', { ascending: false });
+
   if (userId) {
-    q = query(q, where('targetUsers', 'array-contains', userId));
+    query = query.contains('target_users', [userId]);
   }
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Nudge);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
 };
 
 export const markNudgeAsRead = async (nudgeId: string, userId: string): Promise<void> => {
-  const docRef = doc(db, 'nudges', nudgeId);
-  await updateDoc(docRef, {
-    isRead: true,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('nudges')
+    .update({
+      is_read: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', nudgeId);
+
+  if (error) throw error;
 };
 
 export const dismissNudge = async (nudgeId: string): Promise<void> => {
-  const docRef = doc(db, 'nudges', nudgeId);
-  await updateDoc(docRef, {
-    isDismissed: true,
-    updatedAt: serverTimestamp(),
-  });
+  const { error } = await supabase
+    .from('nudges')
+    .update({
+      is_dismissed: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', nudgeId);
+
+  if (error) throw error;
 };
 
 // Chat and Conflict Management
 export const sendChatMessage = async (message: Omit<ChatMessage, 'id' | 'timestamp'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'chatMessages'), {
-    ...message,
-    timestamp: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .insert({
+      ...message,
+      timestamp: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
-export const getChatMessages = async (householdId: string, limit: number = 50): Promise<ChatMessage[]> => {
-  const q = query(
-    collection(db, 'chatMessages'),
-    where('householdId', '==', householdId),
-    orderBy('timestamp', 'desc'),
-    limit(limit)
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as ChatMessage);
+export const getChatMessages = async (householdId: string, limitCount: number = 50): Promise<ChatMessage[]> => {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('timestamp', { ascending: false })
+    .limit(limitCount);
+
+  if (error) throw error;
+  return data || [];
 };
 
 export const createConflictAnalysis = async (analysis: Omit<ConflictAnalysis, 'id' | 'createdAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'conflictAnalyses'), {
-    ...analysis,
-    createdAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('conflict_analyses')
+    .insert({
+      ...analysis,
+      created_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const createConflictCoachSession = async (session: Omit<ConflictCoachSession, 'id' | 'startedAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'conflictCoachSessions'), {
-    ...session,
-    startedAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('conflict_coach_sessions')
+    .insert({
+      ...session,
+      started_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const updateConflictCoachSession = async (sessionId: string, updates: Partial<ConflictCoachSession>): Promise<void> => {
-  const docRef = doc(db, 'conflictCoachSessions', sessionId);
-  await updateDoc(docRef, updates);
+  const { error } = await supabase
+    .from('conflict_coach_sessions')
+    .update(updates)
+    .eq('id', sessionId);
+
+  if (error) throw error;
 };
 
 export const getActiveConflictSessions = async (householdId: string): Promise<ConflictCoachSession[]> => {
-  const q = query(
-    collection(db, 'conflictCoachSessions'),
-    where('householdId', '==', householdId),
-    where('status', '==', 'active')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as ConflictCoachSession);
+  const { data, error } = await supabase
+    .from('conflict_coach_sessions')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('status', 'active');
+
+  if (error) throw error;
+  return data || [];
 };
 
 // Notifications
 export const createNotification = async (notification: Omit<Notification, 'id' | 'createdAt'>): Promise<string> => {
-  const docRef = await addDoc(collection(db, 'notifications'), {
-    ...notification,
-    createdAt: serverTimestamp(),
-  });
-  return docRef.id;
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert({
+      ...notification,
+      created_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const getUserNotifications = async (userId: string): Promise<Notification[]> => {
-  const q = query(
-    collection(db, 'notifications'),
-    where('userId', '==', userId),
-    where('isRead', '==', false),
-    orderBy('createdAt', 'desc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Notification);
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_read', false)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
-  const docRef = doc(db, 'notifications', notificationId);
-  await updateDoc(docRef, {
-    isRead: true,
-  });
+  const { error } = await supabase
+    .from('notifications')
+    .update({
+      is_read: true,
+    })
+    .eq('id', notificationId);
+
+  if (error) throw error;
 };
 
 // Settings
 export const getHouseholdSettings = async (householdId: string): Promise<HouseholdSettings | null> => {
-  const docRef = doc(db, 'householdSettings', householdId);
-  const docSnap = await getDoc(docRef);
-  
-  if (docSnap.exists()) {
-    return docSnap.data() as HouseholdSettings;
-  }
-  return null;
+  const { data, error } = await supabase
+    .from('household_settings')
+    .select('*')
+    .eq('household_id', householdId)
+    .single();
+
+  if (error) return null;
+  return data;
 };
 
 export const updateHouseholdSettings = async (householdId: string, settings: Partial<HouseholdSettings>): Promise<void> => {
-  const docRef = doc(db, 'householdSettings', householdId);
-  await updateDoc(docRef, settings);
+  const { error } = await supabase
+    .from('household_settings')
+    .update(settings)
+    .eq('household_id', householdId);
+
+  if (error) throw error;
 };
 
 // Real-time listeners
@@ -388,16 +492,21 @@ export const subscribeToHouseholdUpdates = (
   householdId: string,
   callback: (data: Record<string, unknown>) => void
 ) => {
-  return onSnapshot(
-    query(collection(db, 'households'), where('id', '==', householdId)),
-    (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'modified') {
-          callback({ id: change.doc.id, ...change.doc.data() });
-        }
-      });
-    }
-  );
+  return supabase
+    .channel('household-updates')
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'households',
+        filter: `id=eq.${householdId}`,
+      },
+      (payload) => {
+        callback(payload.new as Record<string, unknown>);
+      }
+    )
+    .subscribe();
 };
 
 export const subscribeToNudges = (
@@ -405,32 +514,44 @@ export const subscribeToNudges = (
   userId: string,
   callback: (nudges: Nudge[]) => void
 ) => {
-  const q = query(
-    collection(db, 'nudges'),
-    where('householdId', '==', householdId),
-    where('targetUsers', 'array-contains', userId),
-    where('isDismissed', '==', false)
-  );
-  
-  return onSnapshot(q, (snapshot) => {
-    const nudges = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Nudge);
-    callback(nudges);
-  });
+  return supabase
+    .channel('nudges')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'nudges',
+        filter: `household_id=eq.${householdId}`,
+      },
+      async () => {
+        // Refetch nudges when there are changes
+        const nudges = await getNudges(householdId, userId);
+        callback(nudges);
+      }
+    )
+    .subscribe();
 };
 
 export const subscribeToNotifications = (
   userId: string,
   callback: (notifications: Notification[]) => void
 ) => {
-  const q = query(
-    collection(db, 'notifications'),
-    where('userId', '==', userId),
-    where('isRead', '==', false),
-    orderBy('createdAt', 'desc')
-  );
-  
-  return onSnapshot(q, (snapshot) => {
-    const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Notification);
-    callback(notifications);
-  });
+  return supabase
+    .channel('notifications')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      },
+      async () => {
+        // Refetch notifications when there are changes
+        const notifications = await getUserNotifications(userId);
+        callback(notifications);
+      }
+    )
+    .subscribe();
 }; 

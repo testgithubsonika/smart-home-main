@@ -1,17 +1,34 @@
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+// This file has been migrated to Supabase
+// All functionality is now available in @/services/supabaseService
+
+import { supabase } from "@/lib/supabase";
 
 export const saveVerificationResult = async (userId: string, verified: boolean) => {
-  const ref = doc(db, "identityVerifications", userId);
-  await setDoc(ref, {
-    userId,
-    verified,
-    verifiedAt: new Date().toISOString(),
-  });
+  const { error } = await supabase
+    .from("identity_verifications")
+    .upsert({
+      user_id: userId,
+      verified,
+      verified_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    console.error('Error saving verification result:', error);
+    throw error;
+  }
 };
 
 export const checkVerificationStatus = async (userId: string): Promise<boolean> => {
-  const ref = doc(db, "identityVerifications", userId);
-  const snap = await getDoc(ref);
-  return snap.exists() && snap.data().verified === true;
+  const { data, error } = await supabase
+    .from("identity_verifications")
+    .select("verified")
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    console.error('Error checking verification status:', error);
+    return false;
+  }
+
+  return data?.verified === true;
 };

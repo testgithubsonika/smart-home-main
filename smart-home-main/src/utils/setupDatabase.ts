@@ -1,15 +1,4 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  writeBatch,
-  serverTimestamp,
-  Timestamp,
-  getDocs,
-  query,
-  limit
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import {
   Household,
   RentPayment,
@@ -127,7 +116,7 @@ const sampleBills: Omit<Bill, 'id'>[] = [
     amount: 120.50,
     dueDate: new Date('2024-01-15'),
     category: 'electricity',
-    status: 'unpaid',
+    status: 'pending',
     paidBy: undefined,
     splitBetween: ['user1', 'user2', 'user3'],
     notes: 'Monthly electricity bill',
@@ -153,7 +142,7 @@ const sampleBills: Omit<Bill, 'id'>[] = [
     amount: 45.00,
     dueDate: new Date('2024-01-25'),
     category: 'water',
-    status: 'unpaid',
+    status: 'pending',
     paidBy: undefined,
     splitBetween: ['user1', 'user2', 'user3'],
     notes: 'Monthly water bill',
@@ -249,7 +238,20 @@ const sampleSensors: Omit<Sensor, 'id'>[] = [
     location: 'Kitchen',
     isActive: true,
     lastReading: {
-      value: true,
+      value: { motion: true, timestamp: Date.now() },
+      timestamp: new Date()
+    },
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date()
+  },
+  {
+    householdId: 'household1',
+    name: 'Living Room Temperature Sensor',
+    type: 'temperature',
+    location: 'Living Room',
+    isActive: true,
+    lastReading: {
+      value: { temperature: 72, humidity: 45 },
       timestamp: new Date()
     },
     createdAt: new Date('2024-01-01'),
@@ -262,20 +264,7 @@ const sampleSensors: Omit<Sensor, 'id'>[] = [
     location: 'Front Door',
     isActive: true,
     lastReading: {
-      value: false,
-      timestamp: new Date()
-    },
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date()
-  },
-  {
-    householdId: 'household1',
-    name: 'Trash Level Sensor',
-    type: 'trash',
-    location: 'Kitchen',
-    isActive: true,
-    lastReading: {
-      value: 75,
+      value: { open: false, timestamp: Date.now() },
       timestamp: new Date()
     },
     createdAt: new Date('2024-01-01'),
@@ -287,23 +276,23 @@ const sampleSensorEvents: Omit<SensorEvent, 'id'>[] = [
   {
     sensorId: 'sensor1',
     eventType: 'motion_detected',
-    value: true,
-    timestamp: new Date(),
-    metadata: { duration: 300 }
+    value: { duration: 45, intensity: 'medium' },
+    timestamp: new Date('2024-01-15T08:30:00Z'),
+    metadata: { duration: 45, intensity: 'medium' }
   },
   {
     sensorId: 'sensor2',
-    eventType: 'door_opened',
-    value: true,
-    timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-    metadata: { user: 'user1' }
+    eventType: 'threshold_exceeded',
+    value: { temperature: 72, humidity: 45 },
+    timestamp: new Date('2024-01-15T12:00:00Z'),
+    metadata: { temperature: 72, humidity: 45 }
   },
   {
     sensorId: 'sensor3',
-    eventType: 'threshold_exceeded',
-    value: 80,
-    timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-    metadata: { threshold: 75 }
+    eventType: 'door_opened',
+    value: { openDuration: 300 },
+    timestamp: new Date('2024-01-15T18:45:00Z'),
+    metadata: { openDuration: 300 }
   }
 ];
 
@@ -311,26 +300,28 @@ const sampleNudges: Omit<Nudge, 'id'>[] = [
   {
     householdId: 'household1',
     title: 'Kitchen Cleanup Reminder',
-    message: 'The kitchen motion sensor detected activity. Don\'t forget to clean up after cooking!',
+    message: 'The kitchen motion sensor detected activity. Consider cleaning up after cooking!',
     type: 'chore_reminder',
     priority: 'medium',
     targetUsers: ['user1', 'user2', 'user3'],
     isRead: false,
     isDismissed: false,
-    expiresAt: new Date(Date.now() + 86400000), // 24 hours
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    actionUrl: '/harmony-hub?tab=chores',
     createdAt: new Date(),
     updatedAt: new Date()
   },
   {
     householdId: 'household1',
-    title: 'Trash Almost Full',
-    message: 'The trash level sensor shows 80% full. Consider taking it out soon.',
-    type: 'sensor_triggered',
-    priority: 'low',
-    targetUsers: ['user1', 'user2', 'user3'],
+    title: 'Rent Payment Overdue',
+    message: 'Your rent payment is overdue. Please submit payment as soon as possible.',
+    type: 'rent_due',
+    priority: 'high',
+    targetUsers: ['user3'],
     isRead: false,
     isDismissed: false,
-    expiresAt: new Date(Date.now() + 86400000), // 24 hours
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    actionUrl: '/harmony-hub?tab=rent',
     createdAt: new Date(),
     updatedAt: new Date()
   }
@@ -340,25 +331,33 @@ const sampleChatMessages: Omit<ChatMessage, 'id'>[] = [
   {
     householdId: 'household1',
     userId: 'user1',
-    content: 'Hey everyone! I noticed the kitchen is getting a bit messy. Should we set up a cleaning schedule?',
-    timestamp: new Date(Date.now() - 86400000), // 1 day ago
-    sentiment: 'neutral',
+    content: 'Hey everyone! I cleaned the kitchen this morning. All set for the day!',
+    timestamp: new Date('2024-01-15T08:00:00Z'),
+    sentiment: 'positive',
     isEdited: false
   },
   {
     householdId: 'household1',
     userId: 'user2',
-    content: 'That\'s a great idea! I\'m happy to help create one.',
-    timestamp: new Date(Date.now() - 82800000), // 23 hours ago
+    content: 'Thanks Alex! I\'ll handle the living room vacuuming this evening.',
+    timestamp: new Date('2024-01-15T08:05:00Z'),
     sentiment: 'positive',
     isEdited: false
   },
   {
     householdId: 'household1',
     userId: 'user3',
-    content: 'Sure, but I think we should also talk about the noise levels at night.',
-    timestamp: new Date(Date.now() - 79200000), // 22 hours ago
+    content: 'I\'m a bit behind on rent this month. Can we talk about a payment plan?',
+    timestamp: new Date('2024-01-15T08:10:00Z'),
     sentiment: 'neutral',
+    isEdited: false
+  },
+  {
+    householdId: 'household1',
+    userId: 'user1',
+    content: 'No worries Jordan, we can work something out. Let\'s discuss it tonight.',
+    timestamp: new Date('2024-01-15T08:15:00Z'),
+    sentiment: 'positive',
     isEdited: false
   }
 ];
@@ -367,243 +366,330 @@ const sampleNotifications: Omit<Notification, 'id'>[] = [
   {
     userId: 'user1',
     householdId: 'household1',
-    type: 'chore_assigned',
-    title: 'New Chore Assigned',
-    message: 'You have been assigned: Clean Kitchen',
+    type: 'chore_completed',
+    title: 'Chore Completed',
+    message: 'Sam completed the living room vacuuming chore',
     isRead: false,
-    actionUrl: '/chores',
-    createdAt: new Date()
+    actionUrl: '/harmony-hub?tab=chores',
+    metadata: {
+      choreId: 'chore2',
+      completedBy: 'user2'
+    },
+    createdAt: new Date('2024-01-10T14:30:00Z')
   },
   {
-    userId: 'user2',
+    userId: 'user3',
     householdId: 'household1',
-    type: 'bill_due',
-    title: 'Bill Due Soon',
-    message: 'Internet bill is due in 3 days',
+    type: 'rent_due',
+    title: 'Rent Payment Overdue',
+    message: 'Your rent payment is overdue. Please submit payment.',
     isRead: false,
-    actionUrl: '/bills',
-    createdAt: new Date()
+    actionUrl: '/harmony-hub?tab=rent',
+    metadata: {
+      amount: 933.34,
+      dueDate: '2024-01-01'
+    },
+    createdAt: new Date('2024-01-02T00:00:00Z')
   }
 ];
 
-const sampleHouseholdSettings: Omit<HouseholdSettings, 'householdId'>[] = [
-  {
-    rentReminders: {
-      enabled: true,
-      daysBeforeDue: 3
-    },
-    billReminders: {
-      enabled: true,
-      daysBeforeDue: 5
-    },
-    choreReminders: {
-      enabled: true,
-      frequency: 'daily'
-    },
-    sensorNudges: {
-      enabled: true,
-      types: ['motion', 'door', 'trash']
-    },
-    conflictCoaching: {
-      enabled: true,
-      autoTrigger: true,
-      sentimentThreshold: 'medium'
-    },
-    notifications: {
-      email: true,
-      push: true,
-      sms: false
-    }
+const sampleHouseholdSettings: Omit<HouseholdSettings, 'id'> = {
+  householdId: 'household1',
+  rentReminders: {
+    enabled: true,
+    daysBeforeDue: 3
+  },
+  billReminders: {
+    enabled: true,
+    daysBeforeDue: 5
+  },
+  choreReminders: {
+    enabled: true,
+    frequency: 'daily'
+  },
+  sensorNudges: {
+    enabled: true,
+    types: ['motion', 'door', 'trash']
+  },
+  conflictCoaching: {
+    enabled: true,
+    autoTrigger: true,
+    sentimentThreshold: 'medium'
+  },
+  notifications: {
+    email: true,
+    push: true,
+    sms: false
   }
-];
+};
 
 class DatabaseSetup {
-  private batch: ReturnType<typeof writeBatch>;
   private documentIds: Map<string, string> = new Map();
 
   constructor() {
-    this.batch = writeBatch(db);
+    // Initialize with empty map
   }
 
-  private async addDocument(collectionName: string, data: Record<string, unknown>, customId?: string): Promise<string> {
-    const docRef = await addDoc(collection(db, collectionName), {
-      ...data,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    
-    if (customId) {
-      this.documentIds.set(customId, docRef.id);
+  private async insertRecord(tableName: string, data: Record<string, unknown>, customId?: string): Promise<string> {
+    try {
+      // Use admin client to bypass RLS for setup operations
+      const client = supabaseAdmin || supabase;
+      
+      const { data: result, error } = await client
+        .from(tableName)
+        .insert(data)
+        .select()
+        .single();
+
+      if (error) {
+        console.error(`Error inserting into ${tableName}:`, error);
+        throw error;
+      }
+
+      const recordId = result.id;
+      if (customId) {
+        this.documentIds.set(customId, recordId);
+      }
+      
+      return recordId;
+    } catch (error) {
+      console.error(`Failed to insert record into ${tableName}:`, error);
+      throw error;
     }
-    
-    return docRef.id;
   }
 
   async checkIfDatabaseIsEmpty(): Promise<boolean> {
     try {
-      // Check a few key collections
-      const collections = ['households', 'users', 'chores', 'bills'];
+      // Use admin client to bypass RLS for setup operations
+      const client = supabaseAdmin || supabase;
       
-      for (const collectionName of collections) {
-        const q = query(collection(db, collectionName), limit(1));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          return false; // Database has data
-        }
+      // Check if households table is empty
+      const { data: households, error } = await client
+        .from('households')
+        .select('id')
+        .limit(1);
+
+      if (error) {
+        console.error('Error checking database:', error);
+        throw error;
       }
-      
-      return true; // Database is empty
+
+      return !households || households.length === 0;
     } catch (error) {
-      console.error('Error checking database:', error);
-      return true; // Assume empty if error
+      console.error('Failed to check database status:', error);
+      return true; // Assume empty if we can't check
     }
   }
 
   async setupDatabase(): Promise<void> {
-    console.log('Starting database setup...');
-    
-    const isEmpty = await this.checkIfDatabaseIsEmpty();
-    if (!isEmpty) {
-      console.log('Database already has data. Skipping setup.');
-      return;
-    }
-
     try {
-      // For development, we'll create sample data with the current user
-      // In a real app, you'd have multiple users joining households
-      const currentUserId = 'current_user'; // This would be the actual Clerk user ID
-      
-      // Create sample users (in real app, these would be actual Clerk users)
-      console.log('Creating sample users...');
-      const sampleUserIds = ['user1', 'user2', 'user3'];
-      
-      for (let i = 0; i < 3; i++) {
-        const userData = createSampleUsers(sampleUserIds)[i];
-        const userId = await this.addDocument('users', userData, `user${i + 1}`);
-        console.log(`Created user: ${userId}`);
+      console.log('Starting database setup...');
+
+      // Check if database is already populated
+      const isEmpty = await this.checkIfDatabaseIsEmpty();
+      if (!isEmpty) {
+        console.log('Database already contains data. Skipping setup.');
+        return;
       }
 
-      // Create households
-      console.log('Creating households...');
-      const householdData = createSampleHouseholds(sampleUserIds)[0];
-      const householdId = await this.addDocument('households', householdData, 'household1');
-      console.log(`Created household: ${householdId}`);
+      // Create sample household
+      console.log('Creating sample household...');
+      const householdData = createSampleHouseholds(['user1', 'user2', 'user3'])[0];
+      const { createdAt, updatedAt, ...householdDataWithoutDates } = householdData;
+      const householdId = await this.insertRecord('households', {
+        ...householdDataWithoutDates,
+        created_at: createdAt.toISOString(),
+        updated_at: updatedAt.toISOString()
+      }, 'household1');
+      console.log('✓ Household created:', householdId);
 
       // Create rent schedules
       console.log('Creating rent schedules...');
       for (const schedule of sampleRentSchedules) {
-        const scheduleId = await this.addDocument('rentSchedules', schedule);
-        console.log(`Created rent schedule: ${scheduleId}`);
+        await this.insertRecord('rent_schedules', {
+          ...schedule,
+          household_id: householdId,
+          start_date: schedule.startDate.toISOString(),
+          end_date: schedule.endDate?.toISOString()
+        });
       }
+      console.log('✓ Rent schedules created');
 
       // Create rent payments
       console.log('Creating rent payments...');
       for (const payment of sampleRentPayments) {
-        const paymentId = await this.addDocument('rentPayments', payment);
-        console.log(`Created rent payment: ${paymentId}`);
+        const { createdAt, updatedAt, dueDate, paidDate, ...paymentDataWithoutDates } = payment;
+        await this.insertRecord('rent_payments', {
+          ...paymentDataWithoutDates,
+          due_date: dueDate.toISOString(),
+          paid_date: paidDate?.toISOString(),
+          created_at: createdAt.toISOString(),
+          updated_at: updatedAt.toISOString()
+        });
       }
+      console.log('✓ Rent payments created');
 
       // Create bills
       console.log('Creating bills...');
-      for (let i = 0; i < sampleBills.length; i++) {
-        const billId = await this.addDocument('bills', sampleBills[i], `bill${i + 1}`);
-        console.log(`Created bill: ${billId}`);
+      for (const bill of sampleBills) {
+        const { createdAt, updatedAt, dueDate, paidDate, ...billDataWithoutDates } = bill;
+        await this.insertRecord('bills', {
+          ...billDataWithoutDates,
+          due_date: dueDate.toISOString(),
+          paid_date: paidDate?.toISOString(),
+          created_at: createdAt.toISOString(),
+          updated_at: updatedAt.toISOString()
+        });
       }
+      console.log('✓ Bills created');
 
       // Create chores
       console.log('Creating chores...');
+      const choreIds: string[] = [];
       for (let i = 0; i < sampleChores.length; i++) {
-        const choreId = await this.addDocument('chores', sampleChores[i], `chore${i + 1}`);
-        console.log(`Created chore: ${choreId}`);
+        const chore = sampleChores[i];
+        const { createdAt, updatedAt, dueDate, completedDate, ...choreDataWithoutDates } = chore;
+        const choreId = await this.insertRecord('chores', {
+          ...choreDataWithoutDates,
+          due_date: dueDate?.toISOString(),
+          completed_date: completedDate?.toISOString(),
+          created_at: createdAt.toISOString(),
+          updated_at: updatedAt.toISOString()
+        }, `chore${i + 1}`);
+        choreIds.push(choreId);
       }
+      console.log('✓ Chores created');
 
       // Create chore completions
       console.log('Creating chore completions...');
       for (const completion of sampleChoreCompletions) {
-        const completionId = await this.addDocument('choreCompletions', completion);
-        console.log(`Created chore completion: ${completionId}`);
+        await this.insertRecord('chore_completions', {
+          ...completion,
+          chore_id: this.documentIds.get(completion.choreId) || completion.choreId,
+          completed_at: completion.completedAt.toISOString()
+        });
       }
+      console.log('✓ Chore completions created');
 
       // Create sensors
       console.log('Creating sensors...');
+      const sensorIds: string[] = [];
       for (let i = 0; i < sampleSensors.length; i++) {
-        const sensorId = await this.addDocument('sensors', sampleSensors[i], `sensor${i + 1}`);
-        console.log(`Created sensor: ${sensorId}`);
+        const sensor = sampleSensors[i];
+        const { createdAt, updatedAt, lastReading, ...sensorDataWithoutDates } = sensor;
+        const sensorId = await this.insertRecord('sensors', {
+          ...sensorDataWithoutDates,
+          last_reading: lastReading,
+          created_at: createdAt.toISOString(),
+          updated_at: updatedAt.toISOString()
+        }, `sensor${i + 1}`);
+        sensorIds.push(sensorId);
       }
+      console.log('✓ Sensors created');
 
       // Create sensor events
       console.log('Creating sensor events...');
       for (const event of sampleSensorEvents) {
-        const eventId = await this.addDocument('sensorEvents', event);
-        console.log(`Created sensor event: ${eventId}`);
+                 await this.insertRecord('sensor_events', {
+           ...event,
+           sensor_id: this.documentIds.get(event.sensorId) || event.sensorId,
+           timestamp: event.timestamp.toISOString()
+         });
       }
+      console.log('✓ Sensor events created');
 
       // Create nudges
       console.log('Creating nudges...');
       for (const nudge of sampleNudges) {
-        const nudgeId = await this.addDocument('nudges', nudge);
-        console.log(`Created nudge: ${nudgeId}`);
+        const { createdAt, updatedAt, expiresAt, ...nudgeDataWithoutDates } = nudge;
+        await this.insertRecord('nudges', {
+          ...nudgeDataWithoutDates,
+          expires_at: expiresAt?.toISOString(),
+          created_at: createdAt.toISOString(),
+          updated_at: updatedAt.toISOString()
+        });
       }
+      console.log('✓ Nudges created');
 
       // Create chat messages
       console.log('Creating chat messages...');
       for (const message of sampleChatMessages) {
-        const messageId = await this.addDocument('chatMessages', message);
-        console.log(`Created chat message: ${messageId}`);
+                 await this.insertRecord('chat_messages', {
+           ...message,
+           household_id: householdId,
+           timestamp: message.timestamp.toISOString()
+         });
       }
+      console.log('✓ Chat messages created');
 
       // Create notifications
       console.log('Creating notifications...');
       for (const notification of sampleNotifications) {
-        const notificationId = await this.addDocument('notifications', notification);
-        console.log(`Created notification: ${notificationId}`);
+        const { createdAt, ...notificationDataWithoutDates } = notification;
+        await this.insertRecord('notifications', {
+          ...notificationDataWithoutDates,
+          created_at: createdAt.toISOString()
+        });
       }
+      console.log('✓ Notifications created');
 
       // Create household settings
       console.log('Creating household settings...');
-      for (let i = 0; i < sampleHouseholdSettings.length; i++) {
-        const settingsId = await this.addDocument('householdSettings', {
-          householdId: this.documentIds.get(`household${i + 1}`),
-          ...sampleHouseholdSettings[i]
-        });
-        console.log(`Created household settings: ${settingsId}`);
-      }
+             await this.insertRecord('household_settings', {
+         ...sampleHouseholdSettings,
+         household_id: householdId
+       });
+      console.log('✓ Household settings created');
 
-      console.log('Database setup completed successfully!');
-      console.log('Created document IDs:', Object.fromEntries(this.documentIds));
-      
+      console.log('✓ Database setup completed successfully!');
+      console.log('Created IDs:', Object.fromEntries(this.documentIds));
     } catch (error) {
-      console.error('Error setting up database:', error);
+      console.error('Database setup failed:', error);
       throw error;
     }
   }
 
   async clearDatabase(): Promise<void> {
-    console.log('Clearing database...');
-    
-    const collections = [
-      'users', 'households', 'rentSchedules', 'rentPayments', 'bills', 
-      'chores', 'choreCompletions', 'sensors', 'sensorEvents', 'nudges', 
-      'chatMessages', 'notifications', 'householdSettings'
-    ];
+    try {
+      console.log('Clearing database...');
+      
+      // Use admin client to bypass RLS for setup operations
+      const client = supabaseAdmin || supabase;
+      
+      const tables = [
+        'notifications',
+        'chat_messages',
+        'nudges',
+        'sensor_events',
+        'sensors',
+        'chore_completions',
+        'chores',
+        'bills',
+        'rent_schedules',
+        'rent_payments',
+        'household_settings',
+        'households'
+      ];
 
-    for (const collectionName of collections) {
-      try {
-        const snapshot = await getDocs(collection(db, collectionName));
-        const batch = writeBatch(db);
-        
-        snapshot.docs.forEach((doc) => {
-          batch.delete(doc.ref);
-        });
-        
-        await batch.commit();
-        console.log(`Cleared collection: ${collectionName}`);
-      } catch (error) {
-        console.error(`Error clearing ${collectionName}:`, error);
+      for (const table of tables) {
+        const { error } = await client
+          .from(table)
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all except dummy record
+
+        if (error) {
+          console.error(`Error clearing ${table}:`, error);
+        } else {
+          console.log(`✓ Cleared ${table}`);
+        }
       }
+
+      this.documentIds.clear();
+      console.log('✓ Database cleared successfully!');
+    } catch (error) {
+      console.error('Failed to clear database:', error);
+      throw error;
     }
-    
-    console.log('Database cleared successfully!');
   }
 
   getCreatedIds(): Map<string, string> {
@@ -618,6 +704,4 @@ const databaseSetup = new DatabaseSetup();
 export const setupDatabase = () => databaseSetup.setupDatabase();
 export const clearDatabase = () => databaseSetup.clearDatabase();
 export const checkDatabaseEmpty = () => databaseSetup.checkIfDatabaseIsEmpty();
-export const getCreatedIds = () => databaseSetup.getCreatedIds();
-
-export default databaseSetup; 
+export const getCreatedIds = () => databaseSetup.getCreatedIds(); 

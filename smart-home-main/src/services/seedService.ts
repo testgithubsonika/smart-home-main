@@ -1,12 +1,4 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  writeBatch,
-  serverTimestamp,
-  Timestamp 
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import {
   Household,
   RentPayment,
@@ -70,603 +62,469 @@ const sampleHouseholds = [
     rentDueDay: 1,
     memberIds: ['user1', 'user2', 'user3'],
     adminId: 'user1',
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  }
-];
-
-const sampleRentSchedules = [
-  {
-    householdId: 'household1',
-    amount: 2800,
-    dueDay: 1,
-    frequency: 'monthly',
-    startDate: new Date('2024-01-01'),
-    endDate: new Date('2024-12-31'),
-    isActive: true,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  }
-];
-
-const sampleRentPayments = [
-  {
-    householdId: 'household1',
-    userId: 'user1',
-    amount: 933.33,
-    dueDate: new Date('2024-01-01'),
-    paidDate: new Date('2024-01-01'),
-    status: 'paid',
-    method: 'bank_transfer',
-    notes: 'January rent payment',
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    userId: 'user2',
-    amount: 933.33,
-    dueDate: new Date('2024-01-01'),
-    paidDate: new Date('2024-01-02'),
-    status: 'paid',
-    method: 'credit_card',
-    notes: 'January rent payment',
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    userId: 'user3',
-    amount: 933.34,
-    dueDate: new Date('2024-01-01'),
-    paidDate: null,
-    status: 'overdue',
-    method: 'pending',
-    notes: 'January rent payment - overdue',
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  }
-];
-
-const sampleBills = [
-  {
-    householdId: 'household1',
-    name: 'Electricity',
-    amount: 120.50,
-    dueDate: new Date('2024-01-15'),
-    category: 'utilities',
-    status: 'unpaid',
-    assignedTo: 'user1',
-    notes: 'Monthly electricity bill',
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    name: 'Internet',
-    amount: 89.99,
-    dueDate: new Date('2024-01-20'),
-    category: 'utilities',
-    status: 'paid',
-    assignedTo: 'user2',
-    notes: 'Monthly internet bill',
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    name: 'Water',
-    amount: 45.00,
-    dueDate: new Date('2024-01-25'),
-    category: 'utilities',
-    status: 'unpaid',
-    assignedTo: 'user3',
-    notes: 'Monthly water bill',
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
 const sampleChores = [
   {
-    householdId: 'household1',
+    household_id: 'household1',
     title: 'Clean Kitchen',
     description: 'Wipe counters, clean sink, take out trash',
-    assignedTo: 'user1',
-    frequency: 'daily',
-    points: 10,
+    assigned_to: 'user1',
+    assigned_by: 'user1',
+    due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     status: 'pending',
-    dueDate: new Date('2024-01-15'),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    priority: 'medium',
+    category: 'cleaning',
+    points: 10,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
-    householdId: 'household1',
+    household_id: 'household1',
+    title: 'Take out Trash',
+    description: 'Empty all trash bins and recycling',
+    assigned_to: 'user2',
+    assigned_by: 'user1',
+    due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'pending',
+    priority: 'high',
+    category: 'cleaning',
+    points: 5,
+    recurring: {
+      frequency: 'weekly',
+      interval: 1
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    household_id: 'household1',
     title: 'Vacuum Living Room',
     description: 'Vacuum carpets and clean surfaces',
-    assignedTo: 'user2',
-    frequency: 'weekly',
-    points: 15,
-    status: 'completed',
-    dueDate: new Date('2024-01-10'),
-    completedDate: new Date('2024-01-10'),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    title: 'Take Out Recycling',
-    description: 'Sort and take out recycling bins',
-    assignedTo: 'user3',
-    frequency: 'weekly',
+    assigned_to: 'user3',
+    assigned_by: 'user1',
+    due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'pending',
+    priority: 'low',
+    category: 'cleaning',
     points: 8,
-    status: 'pending',
-    dueDate: new Date('2024-01-16'),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    title: 'Clean Bathroom',
-    description: 'Clean toilet, sink, and shower',
-    assignedTo: 'user1',
-    frequency: 'weekly',
-    points: 20,
-    status: 'pending',
-    dueDate: new Date('2024-01-18'),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
-const sampleChoreCompletions = [
+const sampleBills = [
   {
-    householdId: 'household1',
-    choreId: 'chore2',
-    userId: 'user2',
-    completedAt: new Date('2024-01-10T14:30:00Z'),
-    points: 15,
-    notes: 'Completed vacuuming and dusting',
-    createdAt: serverTimestamp()
+    household_id: 'household1',
+    name: 'Electricity Bill',
+    amount: 120.50,
+    due_date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'pending',
+    category: 'electricity',
+    paid_by: null,
+    split_between: ['user1', 'user2', 'user3'],
+    notes: 'Monthly electricity bill',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    household_id: 'household1',
+    name: 'Internet Bill',
+    amount: 89.99,
+    due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'pending',
+    category: 'internet',
+    paid_by: null,
+    split_between: ['user1', 'user2', 'user3'],
+    notes: 'Monthly internet service',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
 const sampleSensors = [
   {
-    householdId: 'household1',
+    household_id: 'household1',
     name: 'Kitchen Motion Sensor',
     type: 'motion',
     location: 'kitchen',
-    isActive: true,
-    settings: {
-      sensitivity: 'medium',
-      triggerDelay: 30,
-      notifications: true
+    is_active: true,
+    last_reading: {
+      value: { motion: true, timestamp: Date.now() },
+      timestamp: new Date().toISOString()
     },
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
-    householdId: 'household1',
-    name: 'Living Room Motion Sensor',
-    type: 'motion',
+    household_id: 'household1',
+    name: 'Living Room Temperature',
+    type: 'temperature',
     location: 'living_room',
-    isActive: true,
-    settings: {
-      sensitivity: 'high',
-      triggerDelay: 15,
-      notifications: true
+    is_active: true,
+    last_reading: {
+      value: { temperature: 72, humidity: 45 },
+      timestamp: new Date().toISOString()
     },
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
-    householdId: 'household1',
-    name: 'Bathroom Door Sensor',
+    household_id: 'household1',
+    name: 'Front Door Sensor',
     type: 'door',
-    location: 'bathroom',
-    isActive: true,
-    settings: {
-      notifications: false,
-      autoLog: true
+    location: 'front_door',
+    is_active: true,
+    last_reading: {
+      value: { open: false, timestamp: Date.now() },
+      timestamp: new Date().toISOString()
     },
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  }
-];
-
-const sampleSensorEvents = [
-  {
-    sensorId: 'sensor1',
-    type: 'motion_detected',
-    timestamp: new Date('2024-01-15T08:30:00Z'),
-    data: {
-      duration: 45,
-      intensity: 'medium'
-    },
-    createdAt: serverTimestamp()
-  },
-  {
-    sensorId: 'sensor2',
-    type: 'motion_detected',
-    timestamp: new Date('2024-01-15T19:15:00Z'),
-    data: {
-      duration: 120,
-      intensity: 'high'
-    },
-    createdAt: serverTimestamp()
-  },
-  {
-    sensorId: 'sensor3',
-    type: 'door_opened',
-    timestamp: new Date('2024-01-15T20:45:00Z'),
-    data: {
-      openDuration: 300
-    },
-    createdAt: serverTimestamp()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
 const sampleNudges = [
   {
-    householdId: 'household1',
-    userId: 'user1',
+    household_id: 'household1',
+    title: 'Kitchen Cleanup Reminder',
+    message: 'The kitchen motion sensor detected activity. Consider cleaning up after cooking!',
     type: 'chore_reminder',
-    title: 'Kitchen Cleaning Due',
-    message: 'Your kitchen cleaning chore is due today. Don\'t forget to wipe the counters!',
     priority: 'medium',
-    isRead: false,
-    isDismissed: false,
-    expiresAt: new Date('2024-01-16T23:59:59Z'),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    userId: 'user3',
-    type: 'rent_reminder',
-    title: 'Rent Payment Overdue',
-    message: 'Your rent payment is overdue. Please submit payment as soon as possible.',
-    priority: 'high',
-    isRead: false,
-    isDismissed: false,
-    expiresAt: new Date('2024-01-20T23:59:59Z'),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    userId: 'user2',
-    type: 'bill_reminder',
-    title: 'Internet Bill Due Soon',
-    message: 'Your internet bill is due in 3 days. Amount: $89.99',
-    priority: 'medium',
-    isRead: true,
-    isDismissed: false,
-    expiresAt: new Date('2024-01-23T23:59:59Z'),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    target_users: ['user1', 'user2', 'user3'],
+    is_read: false,
+    is_dismissed: false,
+    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    action_url: '/harmony-hub?tab=chores',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
 const sampleChatMessages = [
   {
-    householdId: 'household1',
-    userId: 'user1',
-    content: 'Hey everyone! I cleaned the kitchen this morning. All set for the day!',
-    type: 'text',
-    timestamp: new Date('2024-01-15T08:00:00Z'),
-    createdAt: serverTimestamp()
+    household_id: 'household1',
+    user_id: 'user1',
+    content: 'Hey everyone! I just cleaned the kitchen. All done! 🧹',
+    timestamp: new Date().toISOString(),
+    sentiment: 'positive',
+    is_edited: false,
+    created_at: new Date().toISOString()
   },
   {
-    householdId: 'household1',
-    userId: 'user2',
-    content: 'Thanks Alex! I\'ll handle the living room vacuuming this evening.',
-    type: 'text',
-    timestamp: new Date('2024-01-15T08:05:00Z'),
-    createdAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    userId: 'user3',
-    content: 'I\'m a bit behind on rent this month. Can we talk about a payment plan?',
-    type: 'text',
-    timestamp: new Date('2024-01-15T08:10:00Z'),
-    createdAt: serverTimestamp()
-  },
-  {
-    householdId: 'household1',
-    userId: 'user1',
-    content: 'No worries Jordan, we can work something out. Let\'s discuss it tonight.',
-    type: 'text',
-    timestamp: new Date('2024-01-15T08:15:00Z'),
-    createdAt: serverTimestamp()
+    household_id: 'household1',
+    user_id: 'user2',
+    content: 'Thanks Alex! Looks great 👍',
+    timestamp: new Date().toISOString(),
+    sentiment: 'positive',
+    is_edited: false,
+    created_at: new Date().toISOString()
   }
 ];
 
 const sampleNotifications = [
   {
-    userId: 'user1',
+    user_id: 'user1',
+    household_id: 'household1',
     type: 'chore_completed',
     title: 'Chore Completed',
-    message: 'Sam completed the living room vacuuming chore',
-    isRead: false,
-    data: {
-      choreId: 'chore2',
-      completedBy: 'user2'
-    },
-    createdAt: serverTimestamp()
-  },
-  {
-    userId: 'user3',
-    type: 'rent_overdue',
-    title: 'Rent Payment Overdue',
-    message: 'Your rent payment is overdue. Please submit payment.',
-    isRead: false,
-    data: {
-      amount: 933.34,
-      dueDate: '2024-01-01'
-    },
-    createdAt: serverTimestamp()
+    message: 'Kitchen cleaning task has been completed by Alex',
+    is_read: false,
+    action_url: '/harmony-hub?tab=chores',
+    metadata: { choreId: 'chore1', completedBy: 'user1' },
+    created_at: new Date().toISOString()
   }
 ];
 
 const sampleHouseholdSettings = {
-  householdId: 'household1',
-  rentSettings: {
-    splitMethod: 'equal',
-    gracePeriod: 3,
-    lateFees: 25
+  household_id: 'household1',
+  rent_settings: {
+    split_method: 'equal',
+    grace_period: 3,
+    late_fees: 25
   },
-  choreSettings: {
-    pointSystem: true,
-    autoAssign: false,
-    reminderFrequency: 'daily'
+  chore_settings: {
+    point_system: true,
+    auto_assign: false,
+    reminder_frequency: 'daily'
   },
-  notificationSettings: {
-    emailNotifications: true,
-    pushNotifications: true,
-    quietHours: {
+  notification_settings: {
+    email_notifications: true,
+    push_notifications: true,
+    quiet_hours: {
       enabled: true,
       start: '22:00',
       end: '08:00'
     }
   },
-  conflictResolution: {
-    autoCoachEnabled: true,
-    sentimentThreshold: 0.3,
-    escalationDelay: 24
+  conflict_resolution: {
+    auto_coach_enabled: true,
+    sentiment_threshold: 0.3,
+    escalation_delay: 24
   },
-  createdAt: serverTimestamp(),
-  updatedAt: serverTimestamp()
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString()
 };
 
 export class SeedService {
-  private batch: ReturnType<typeof writeBatch>;
   private documentIds: Map<string, string> = new Map();
 
   constructor() {
-    this.batch = writeBatch(db);
+    // Initialize with empty map
   }
 
-  private async addDocument(collectionName: string, data: Record<string, unknown>, customId?: string): Promise<string> {
-    const docRef = doc(collection(db, collectionName));
-    const docId = customId || docRef.id;
+  async seedHouseholds(): Promise<void> {
+    console.log('Seeding households...');
     
-    this.batch.set(docRef, {
-      ...data,
-      id: docId
-    });
-    
-    this.documentIds.set(customId || collectionName, docId);
-    return docId;
+    for (const household of sampleHouseholds) {
+      const { data, error } = await supabase
+        .from('households')
+        .insert(household)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error seeding household:', error);
+        throw error;
+      }
+
+      this.documentIds.set('household1', data.id);
+      console.log('Household seeded:', data.id);
+    }
   }
 
-  async seedAllData(): Promise<void> {
+  async seedChores(): Promise<void> {
+    console.log('Seeding chores...');
+    
+    for (const chore of sampleChores) {
+      const { data, error } = await supabase
+        .from('chores')
+        .insert(chore)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error seeding chore:', error);
+        throw error;
+      }
+
+      console.log('Chore seeded:', data.id);
+    }
+  }
+
+  async seedBills(): Promise<void> {
+    console.log('Seeding bills...');
+    
+    for (const bill of sampleBills) {
+      const { data, error } = await supabase
+        .from('bills')
+        .insert(bill)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error seeding bill:', error);
+        throw error;
+      }
+
+      console.log('Bill seeded:', data.id);
+    }
+  }
+
+  async seedSensors(): Promise<void> {
+    console.log('Seeding sensors...');
+    
+    for (const sensor of sampleSensors) {
+      const { data, error } = await supabase
+        .from('sensors')
+        .insert(sensor)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error seeding sensor:', error);
+        throw error;
+      }
+
+      console.log('Sensor seeded:', data.id);
+    }
+  }
+
+  async seedNudges(): Promise<void> {
+    console.log('Seeding nudges...');
+    
+    for (const nudge of sampleNudges) {
+      const { data, error } = await supabase
+        .from('nudges')
+        .insert(nudge)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error seeding nudge:', error);
+        throw error;
+      }
+
+      console.log('Nudge seeded:', data.id);
+    }
+  }
+
+  async seedChatMessages(): Promise<void> {
+    console.log('Seeding chat messages...');
+    
+    for (const message of sampleChatMessages) {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert(message)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error seeding chat message:', error);
+        throw error;
+      }
+
+      console.log('Chat message seeded:', data.id);
+    }
+  }
+
+  async seedNotifications(): Promise<void> {
+    console.log('Seeding notifications...');
+    
+    for (const notification of sampleNotifications) {
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert(notification)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error seeding notification:', error);
+        throw error;
+      }
+
+      console.log('Notification seeded:', data.id);
+    }
+  }
+
+  async seedHouseholdSettings(): Promise<void> {
+    console.log('Seeding household settings...');
+    
+    const { data, error } = await supabase
+      .from('household_settings')
+      .insert(sampleHouseholdSettings)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error seeding household settings:', error);
+      throw error;
+    }
+
+    console.log('Household settings seeded:', data.id);
+  }
+
+  async seedAll(): Promise<void> {
+    console.log('Starting database seeding...');
+    
     try {
-      console.log('Starting database seeding...');
-
-      // Seed households
-      const householdId = await this.addDocument('households', sampleHouseholds[0], 'household1');
-      console.log('✓ Seeded households');
-
-      // Seed rent schedules
-      await this.addDocument('rentSchedules', {
-        ...sampleRentSchedules[0],
-        householdId
-      }, 'rentSchedule1');
-      console.log('✓ Seeded rent schedules');
-
-      // Seed rent payments
-      for (let i = 0; i < sampleRentPayments.length; i++) {
-        await this.addDocument('rentPayments', {
-          ...sampleRentPayments[i],
-          householdId
-        }, `rentPayment${i + 1}`);
-      }
-      console.log('✓ Seeded rent payments');
-
-      // Seed bills
-      for (let i = 0; i < sampleBills.length; i++) {
-        await this.addDocument('bills', {
-          ...sampleBills[i],
-          householdId
-        }, `bill${i + 1}`);
-      }
-      console.log('✓ Seeded bills');
-
-      // Seed chores
-      for (let i = 0; i < sampleChores.length; i++) {
-        await this.addDocument('chores', {
-          ...sampleChores[i],
-          householdId
-        }, `chore${i + 1}`);
-      }
-      console.log('✓ Seeded chores');
-
-      // Seed chore completions
-      for (let i = 0; i < sampleChoreCompletions.length; i++) {
-        await this.addDocument('choreCompletions', {
-          ...sampleChoreCompletions[i],
-          householdId
-        }, `choreCompletion${i + 1}`);
-      }
-      console.log('✓ Seeded chore completions');
-
-      // Seed sensors
-      for (let i = 0; i < sampleSensors.length; i++) {
-        await this.addDocument('sensors', {
-          ...sampleSensors[i],
-          householdId
-        }, `sensor${i + 1}`);
-      }
-      console.log('✓ Seeded sensors');
-
-      // Seed sensor events
-      for (let i = 0; i < sampleSensorEvents.length; i++) {
-        await this.addDocument('sensorEvents', {
-          ...sampleSensorEvents[i],
-          householdId
-        }, `sensorEvent${i + 1}`);
-      }
-      console.log('✓ Seeded sensor events');
-
-      // Seed nudges
-      for (let i = 0; i < sampleNudges.length; i++) {
-        await this.addDocument('nudges', {
-          ...sampleNudges[i],
-          householdId
-        }, `nudge${i + 1}`);
-      }
-      console.log('✓ Seeded nudges');
-
-      // Seed chat messages
-      for (let i = 0; i < sampleChatMessages.length; i++) {
-        await this.addDocument('chatMessages', {
-          ...sampleChatMessages[i],
-          householdId
-        }, `chatMessage${i + 1}`);
-      }
-      console.log('✓ Seeded chat messages');
-
-      // Seed notifications
-      for (let i = 0; i < sampleNotifications.length; i++) {
-        await this.addDocument('notifications', sampleNotifications[i], `notification${i + 1}`);
-      }
-      console.log('✓ Seeded notifications');
-
-      // Seed household settings
-      await this.addDocument('householdSettings', {
-        ...sampleHouseholdSettings,
-        householdId
-      }, 'householdSettings1');
-      console.log('✓ Seeded household settings');
-
-      // Commit all changes
-      await this.batch.commit();
-      console.log('✓ All data seeded successfully!');
-
-      return this.documentIds;
+      // Seed in order to maintain referential integrity
+      await this.seedHouseholds();
+      await this.seedChores();
+      await this.seedBills();
+      await this.seedSensors();
+      await this.seedNudges();
+      await this.seedChatMessages();
+      await this.seedNotifications();
+      await this.seedHouseholdSettings();
+      
+      console.log('Database seeding completed successfully!');
     } catch (error) {
-      console.error('Error seeding data:', error);
+      console.error('Database seeding failed:', error);
       throw error;
     }
   }
 
-  async seedSpecificData(dataType: string): Promise<void> {
-    try {
-      console.log(`Seeding ${dataType}...`);
-
-      switch (dataType) {
-        case 'households': {
-          const householdId = await this.addDocument('households', sampleHouseholds[0], 'household1');
-          console.log('✓ Seeded households');
-          break;
-        }
-
-        case 'chores': {
-          const householdIdForChores = this.documentIds.get('household1') || 'household1';
-          for (let i = 0; i < sampleChores.length; i++) {
-            await this.addDocument('chores', {
-              ...sampleChores[i],
-              householdId: householdIdForChores
-            }, `chore${i + 1}`);
-          }
-          console.log('✓ Seeded chores');
-          break;
-        }
-
-        case 'bills': {
-          const householdIdForBills = this.documentIds.get('household1') || 'household1';
-          for (let i = 0; i < sampleBills.length; i++) {
-            await this.addDocument('bills', {
-              ...sampleBills[i],
-              householdId: householdIdForBills
-            }, `bill${i + 1}`);
-          }
-          console.log('✓ Seeded bills');
-          break;
-        }
-
-        case 'sensors': {
-          const householdIdForSensors = this.documentIds.get('household1') || 'household1';
-          for (let i = 0; i < sampleSensors.length; i++) {
-            await this.addDocument('sensors', {
-              ...sampleSensors[i],
-              householdId: householdIdForSensors
-            }, `sensor${i + 1}`);
-          }
-          console.log('✓ Seeded sensors');
-          break;
-        }
-
-        default:
-          throw new Error(`Unknown data type: ${dataType}`);
-      }
-
-      await this.batch.commit();
-      console.log(`✓ ${dataType} seeded successfully!`);
-    } catch (error) {
-      console.error(`Error seeding ${dataType}:`, error);
-      throw error;
+  async seedSpecificCollection(collectionName: string): Promise<void> {
+    console.log(`Seeding ${collectionName}...`);
+    
+    switch (collectionName) {
+      case 'households':
+        await this.seedHouseholds();
+        break;
+      case 'chores':
+        await this.seedChores();
+        break;
+      case 'bills':
+        await this.seedBills();
+        break;
+      case 'sensors':
+        await this.seedSensors();
+        break;
+      case 'nudges':
+        await this.seedNudges();
+        break;
+      case 'chat_messages':
+        await this.seedChatMessages();
+        break;
+      case 'notifications':
+        await this.seedNotifications();
+        break;
+      case 'household_settings':
+        await this.seedHouseholdSettings();
+        break;
+      default:
+        throw new Error(`Unknown collection: ${collectionName}`);
     }
   }
 
   async clearAllData(): Promise<void> {
-    try {
-      console.log('Clearing all seeded data...');
-      
-      // Note: This is a simplified version. In production, you'd want to be more careful
-      // about what data to delete and ensure proper cleanup
-      
-      const collections = [
-        'households', 'rentSchedules', 'rentPayments', 'bills', 'chores',
-        'choreCompletions', 'sensors', 'sensorEvents', 'nudges', 'chatMessages',
-        'notifications', 'householdSettings'
-      ];
+    console.log('Clearing all data...');
+    
+    const collections = [
+      'notifications',
+      'chat_messages',
+      'nudges',
+      'sensor_events',
+      'sensors',
+      'chore_completions',
+      'chores',
+      'bills',
+      'rent_schedules',
+      'rent_payments',
+      'household_settings',
+      'households'
+    ];
 
-      for (const collectionName of collections) {
-        // In a real implementation, you'd query for documents and delete them
-        // For now, we'll just log that this would happen
-        console.log(`Would clear collection: ${collectionName}`);
+    for (const collection of collections) {
+      const { error } = await supabase
+        .from(collection)
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all except dummy record
+
+      if (error) {
+        console.error(`Error clearing ${collection}:`, error);
+      } else {
+        console.log(`Cleared ${collection}`);
       }
-
-      console.log('✓ Data clearing completed (simulated)');
-    } catch (error) {
-      console.error('Error clearing data:', error);
-      throw error;
     }
+
+    this.documentIds.clear();
+    console.log('All data cleared successfully!');
   }
 
   getSeededIds(): Map<string, string> {
-    return this.documentIds;
+    return new Map(this.documentIds);
   }
 }
 
 // Export singleton instance
 export const seedService = new SeedService();
 
-// Convenience functions
-export const seedDatabase = () => seedService.seedAllData();
-export const seedSpecificCollection = (dataType: string) => seedService.seedSpecificData(dataType);
-export const clearDatabase = () => seedService.clearAllData(); 
+// Export convenience functions
+export const seedDatabase = () => seedService.seedAll();
+export const seedSpecificCollection = (collectionName: string) => seedService.seedSpecificCollection(collectionName);
+export const clearAllData = () => seedService.clearAllData(); 

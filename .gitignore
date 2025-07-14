@@ -67,3 +67,51 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+## 🔒 **Enhanced .gitignore for Smart Home Project**
+
+### **New Security-Related Entries:**
+- **Biometric files**: `biometric-hashes.json`, `webauthn-credentials.json`
+- **Security certificates**: `*.key`, `*.pem`, `*.crt`, `*.cert`
+- **Environment secrets**: `*.secret`, `secrets/`, `.env.secret`
+
+### **Supabase & Database:**
+- **Supabase local files**: `.supabase/`, `supabase/.temp/`
+- **Prisma migrations**: `prisma/migrations/`, `prisma/dev.db`
+- **Additional env patterns**: `.env.*.local`, `.env.staging`
+
+### **AI/ML & Sensor Data:**
+- **Model files**: `models/`, `face-api-models/`, `tensorflow-models/`
+- **Sensor data**: `sensor-data/`, `sensor-logs/`, `*.sensor`
+- **Large model files**: `*.weights`, `*.bin`, `*.shard*`
+
+### **Media & Large Files:**
+- **Additional video formats**: `*.3gp`, `*.ogv`
+- **Additional audio formats**: `*.aac`, `*.ogg`, `*.wma`
+- **Additional image formats**: `*.bmp`, `*.raw`, `*.cr2`, `*.nef`
+
+### **Development & IDE:**
+- **VSCode settings**: `.vscode/settings.json`, `.vscode/launch.json`
+- **Additional IDE files**: `*.sublime-project`, `.atom/`
+- **OS files**: `$RECYCLE.BIN/`, `*.lnk`
+
+### **Build & Cache:**
+- **Generated files**: `generated/`, `auto-generated/`
+- **Documentation builds**: `docs/build/`
+- **Additional cache patterns**: `.jest/`, `dev/`
+
+## 🎯 **Key Benefits:**
+
+1. **Security**: Prevents accidental commit of sensitive data
+2. **Performance**: Excludes large model files and media
+3. **Cleanliness**: Keeps repository focused on source code
+4. **Team Safety**: Prevents environment-specific files from being shared
+
+## 📝 **Optional Considerations:**
+
+You might want to **uncomment** these lines if you prefer to commit lock files:
+```gitignore
+<code_block_to_apply_from>
+```
+
+This enhanced `.gitignore` will help keep your repository clean and secure while working with biometric authentication, AI models, and sensor data in your smart home project!

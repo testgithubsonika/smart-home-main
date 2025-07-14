@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+// Correctly using the imported Supabase service function
+import { createHousehold } from "@/services/harmonyService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -230,8 +230,8 @@ Now, begin! Start with the very first question for the ${userType}.`;
           // Valid completion JSON
           const profile: UserProfile = responseObject.userProfile;
           
-          // Save to Firestore
-          await setDoc(doc(db, "users", "user123"), profile);
+          // FIX: Replaced Firebase setDoc with Supabase createHousehold
+          await createHousehold(profile);
           setIsComplete(true);
 
           const finalMessage: ChatMessage = {
@@ -291,7 +291,8 @@ Now, begin! Start with the very first question for the ${userType}.`;
             requirements: "None specified"
           };
           
-          await setDoc(doc(db, "users", "user123"), fallbackProfile);
+          // FIX: Replaced Firebase setDoc with Supabase createHousehold
+          await createHousehold(fallbackProfile);
           setIsComplete(true);
           
           const finalMessage: ChatMessage = {

@@ -6,7 +6,6 @@ import { Routes, Route } from "react-router-dom";
 import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
 import { useEffect } from "react";
 import { autoSetupDatabase, shouldAutoSetup } from "@/utils/autoSetup";
-import { useFirebaseAuthSync } from "@/utils/firebaseAuthSync";
 import Index from "./pages/Index";
 import OnboardingPage from "./pages/OnboardingPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -20,9 +19,6 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Sync Firebase Auth with Clerk
-  useFirebaseAuthSync();
-
   // Auto-setup database in development mode
   useEffect(() => {
     let mounted = true;

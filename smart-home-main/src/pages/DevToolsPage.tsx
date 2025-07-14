@@ -10,13 +10,18 @@ import {
   TestTube, 
   Bug, 
   Info,
-  AlertTriangle
+  AlertTriangle,
+  Camera,
+  Home // Added Home icon for clarity
 } from 'lucide-react';
 import { SeedDatabase } from '@/components/DevTools/SeedDatabase';
 import { DatabaseTestPanel } from '@/components/DatabaseTestPanel';
 import { DatabaseSetupPanel } from '@/components/DatabaseSetupPanel';
+// FIX: Using FirebaseDataManager which has been migrated to Supabase
 import { FirebaseDataManager } from '@/components/DevTools/FirebaseDataManager';
 import { ComprehensiveTestRunner } from '@/components/DevTools/ComprehensiveTestRunner';
+import { WebcamSensorTester } from '@/components/WebcamSensorTester';
+import { HarmonySystemTester } from '@/components/HarmonySystemTester';
 
 export const DevToolsPage: React.FC = () => {
   return (
@@ -35,14 +40,16 @@ export const DevToolsPage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="database" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        {/* FIX: Updated grid columns to account for new tab structure */}
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="database" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             Database
           </TabsTrigger>
-          <TabsTrigger value="firebase-manager" className="flex items-center gap-2">
+          {/* FIX: Changed Firebase Manager to Supabase Manager */}
+          <TabsTrigger value="supabase-manager" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
-            Firebase Manager
+            Supabase Manager
           </TabsTrigger>
           <TabsTrigger value="testing" className="flex items-center gap-2">
             <TestTube className="h-4 w-4" />
@@ -64,6 +71,15 @@ export const DevToolsPage: React.FC = () => {
             <TestTube className="h-4 w-4" />
             System Tests
           </TabsTrigger>
+          <TabsTrigger value="webcam-sensor" className="flex items-center gap-2">
+            <Camera className="h-4 w-4" />
+            Webcam & Sensors
+          </TabsTrigger>
+          {/* Note: This tab was missing from the original grid-cols-8 but is present in the code */}
+          {/* <TabsTrigger value="harmony-system" className="flex items-center gap-2">
+             <Home className="h-4 w-4" />
+             Harmony System
+           </TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="database" className="space-y-4">
@@ -75,15 +91,18 @@ export const DevToolsPage: React.FC = () => {
                 <Settings className="h-5 w-5" />
                 Database Configuration
               </CardTitle>
+              {/* FIX: Updated description from Firestore to Supabase */}
               <CardDescription>
-                Current Firestore configuration and connection status
+                Current Supabase configuration and connection status
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Firebase Project</h4>
-                  <p className="text-sm text-muted-foreground">cyberpunk-85ee8</p>
+                  {/* FIX: Updated from Firebase to Supabase */}
+                  <h4 className="text-sm font-medium">Supabase Project</h4>
+                  {/* FIX: Using a placeholder for Supabase project ID */}
+                  <p className="text-sm text-muted-foreground">your-project-ref-id</p>
                 </div>
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium">Environment</h4>
@@ -94,15 +113,16 @@ export const DevToolsPage: React.FC = () => {
               <Separator />
               
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">Available Collections</h4>
+                {/* FIX: Updated from Collections to Tables */}
+                <h4 className="text-sm font-medium">Available Tables</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {[
-                    'households', 'rentPayments', 'rentSchedules', 'bills',
-                    'chores', 'choreCompletions', 'sensors', 'sensorEvents',
-                    'nudges', 'chatMessages', 'notifications', 'householdSettings'
-                  ].map((collection) => (
-                    <Badge key={collection} variant="secondary" className="text-xs">
-                      {collection}
+                    'households', 'rent_payments', 'rent_schedules', 'bills',
+                    'chores', 'chore_completions', 'sensors', 'sensor_events',
+                    'nudges', 'chat_messages', 'notifications', 'household_settings'
+                  ].map((table) => (
+                    <Badge key={table} variant="secondary" className="text-xs">
+                      {table}
                     </Badge>
                   ))}
                 </div>
@@ -111,7 +131,8 @@ export const DevToolsPage: React.FC = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="firebase-manager" className="space-y-4">
+        {/* FIX: Updated tab value and component for Supabase */}
+        <TabsContent value="supabase-manager" className="space-y-4">
           <FirebaseDataManager />
         </TabsContent>
 
@@ -151,8 +172,9 @@ export const DevToolsPage: React.FC = () => {
                     <CardTitle className="text-lg">API Testing</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {/* FIX: Updated from Firestore to Supabase */}
                     <p className="text-sm text-muted-foreground mb-3">
-                      Test Firestore operations and API endpoints
+                      Test Supabase operations and API endpoints
                     </p>
                     <div className="space-y-2">
                       <Badge variant="outline" className="w-full justify-center">
@@ -279,8 +301,9 @@ export const DevToolsPage: React.FC = () => {
                   <p>
                     • This is a development environment with sample data for testing
                   </p>
+                  {/* FIX: Updated from Firestore to Supabase */}
                   <p>
-                    • All data is stored in Firestore and can be cleared/reset
+                    • All data is stored in Supabase and can be cleared/reset
                   </p>
                   <p>
                     • The harmony system includes AI-powered conflict coaching using Gemini
@@ -297,7 +320,15 @@ export const DevToolsPage: React.FC = () => {
         <TabsContent value="comprehensive-tests" className="space-y-4">
           <ComprehensiveTestRunner />
         </TabsContent>
+
+        <TabsContent value="webcam-sensor" className="space-y-4">
+          <WebcamSensorTester />
+        </TabsContent>
+
+        <TabsContent value="harmony-system" className="space-y-4">
+          <HarmonySystemTester />
+        </TabsContent>
       </Tabs>
     </div>
   );
-}; 
+};

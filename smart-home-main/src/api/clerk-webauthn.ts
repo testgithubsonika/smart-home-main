@@ -1,6 +1,7 @@
 // Clerk-integrated API layer for WebAuthn authentication
 
 import { useAuth } from '@clerk/clerk-react';
+import { supabase } from '@/lib/supabase';
 
 export interface RegistrationChallenge {
   challenge: string;
@@ -44,26 +45,13 @@ export interface RegistrationRequest {
   email: string;
 }
 
+export interface AuthenticationRequest {
+  userId: string;
+}
+
 export interface RegistrationResponse {
   challenge: RegistrationChallenge;
   sessionId: string;
-}
-
-export interface RegistrationVerificationRequest {
-  sessionId: string;
-  credentialData: {
-    id: string;
-    type: string;
-    rawId: string;
-    response: {
-      attestationObject: string;
-      clientDataJSON: string;
-    };
-  };
-}
-
-export interface AuthenticationRequest {
-  userId: string;
 }
 
 export interface AuthenticationResponse {
@@ -71,35 +59,90 @@ export interface AuthenticationResponse {
   sessionId: string;
 }
 
-export interface AuthenticationVerificationRequest {
-  sessionId: string;
-  credentialData: {
-    id: string;
-    type: string;
-    rawId: string;
-    response: {
-      authenticatorData: string;
-      clientDataJSON: string;
-      signature: string;
-      userHandle?: string;
-    };
-  };
-}
-
 export interface AuthResponse {
   success: boolean;
   error?: string;
 }
 
-// Mock API functions for Clerk integration
-// In a real implementation, these would call your backend API
+// Generate a mock challenge for development
+const generateMockChallenge = (): string => {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array));
+};
+
+// Store WebAuthn credentials in Supabase
+const storeCredential = async (credentialData: any, userId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('webauthn_credentials')
+      .insert({
+        user_id: userId,
+        credential_id: credentialData.id,
+        public_key: credentialData.response.attestationObject,
+        sign_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error storing credential:', error);
+      throw new Error('Failed to store credential');
+    }
+  } catch (error) {
+    console.error('Error storing credential in Supabase:', error);
+    throw error;
+  }
+};
+
+// Get stored credentials from Supabase
+const getStoredCredentials = async (userId: string): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('webauthn_credentials')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error retrieving credentials:', error);
+      throw new Error('Failed to retrieve credentials');
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error getting stored credentials:', error);
+    throw error;
+  }
+};
+
+// Update sign count in Supabase
+const updateSignCount = async (credentialId: string, newSignCount: number): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('webauthn_credentials')
+      .update({
+        sign_count: newSignCount,
+        updated_at: new Date().toISOString()
+      })
+      .eq('credential_id', credentialId);
+
+    if (error) {
+      console.error('Error updating sign count:', error);
+      throw new Error('Failed to update sign count');
+    }
+  } catch (error) {
+    console.error('Error updating sign count in Supabase:', error);
+    throw error;
+  }
+};
 
 // Get registration challenge from server
 export async function getClerkRegistrationChallenge(
   request: RegistrationRequest
 ): Promise<RegistrationResponse> {
   try {
-    // Mock implementation - in real app, this would call your backend
+    // In production, this would call your backend API
+    // For now, we'll generate a challenge locally
     const challenge = generateMockChallenge();
     
     return {
@@ -138,24 +181,24 @@ export async function getClerkRegistrationChallenge(
 
 // Verify registration with server
 export async function verifyClerkRegistration(
-  request: RegistrationVerificationRequest
+  request: {
+    sessionId: string;
+    credentialData: any;
+    userId: string;
+  }
 ): Promise<AuthResponse> {
   try {
-    // Mock implementation - in real app, this would call your backend
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    
-    // Store credential in localStorage for demo purposes
-    const credentials = JSON.parse(localStorage.getItem('webauthn_credentials') || '{}');
-    credentials[request.credentialData.id] = {
-      ...request.credentialData,
-      createdAt: new Date().toISOString(),
-    };
-    localStorage.setItem('webauthn_credentials', JSON.stringify(credentials));
+    // In production, this would verify the attestation with your backend
+    // For now, we'll store the credential in Supabase
+    await storeCredential(request.credentialData, request.userId);
     
     return { success: true };
   } catch (error) {
     console.error('Error verifying registration:', error);
-    throw new Error('Failed to verify registration');
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Registration verification failed' 
+    };
   }
 }
 
@@ -164,20 +207,15 @@ export async function getClerkAuthenticationChallenge(
   request: AuthenticationRequest
 ): Promise<AuthenticationResponse> {
   try {
-    // Mock implementation - in real app, this would call your backend
-    const challenge = generateMockChallenge();
-    
     // Get stored credentials for the user
-    const credentials = JSON.parse(localStorage.getItem('webauthn_credentials') || '{}');
-    const userCredentials = Object.values(credentials).filter((cred: any) => 
-      cred.userId === request.userId
-    );
+    const credentials = await getStoredCredentials(request.userId);
     
-    if (userCredentials.length === 0) {
+    if (credentials.length === 0) {
       throw new Error('No credentials found for user');
     }
     
-    const credential = userCredentials[0] as any;
+    const credential = credentials[0];
+    const challenge = generateMockChallenge();
     
     return {
       challenge: {
@@ -186,7 +224,7 @@ export async function getClerkAuthenticationChallenge(
         allowCredentials: [
           {
             type: 'public-key',
-            id: credential.id,
+            id: credential.credential_id,
             transports: ['internal'],
           },
         ],
@@ -203,66 +241,64 @@ export async function getClerkAuthenticationChallenge(
 
 // Verify authentication with server
 export async function verifyClerkAuthentication(
-  request: AuthenticationVerificationRequest
+  request: {
+    sessionId: string;
+    credentialData: any;
+    userId: string;
+  }
 ): Promise<AuthResponse> {
   try {
-    // Mock implementation - in real app, this would call your backend
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    // In production, this would verify the assertion with your backend
+    // For now, we'll just update the sign count
+    await updateSignCount(request.credentialData.id, 1);
     
     return { success: true };
   } catch (error) {
     console.error('Error verifying authentication:', error);
-    throw new Error('Failed to verify authentication');
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Authentication verification failed' 
+    };
   }
 }
 
-// Check if user has registered credentials
+// Check if user has WebAuthn credentials
 export async function hasClerkCredentials(userId: string): Promise<boolean> {
   try {
-    // Mock implementation - check localStorage for demo
-    const credentials = JSON.parse(localStorage.getItem('webauthn_credentials') || '{}');
-    const userCredentials = Object.values(credentials).filter((cred: any) => 
-      cred.userId === userId
-    );
-    return userCredentials.length > 0;
+    const credentials = await getStoredCredentials(userId);
+    return credentials.length > 0;
   } catch (error) {
     console.error('Error checking credentials:', error);
     return false;
   }
 }
 
-// Get user credentials
+// Get user's WebAuthn credentials
 export async function getClerkUserCredentials(userId: string): Promise<any[]> {
   try {
-    // Mock implementation - get from localStorage for demo
-    const credentials = JSON.parse(localStorage.getItem('webauthn_credentials') || '{}');
-    return Object.values(credentials).filter((cred: any) => 
-      cred.userId === userId
-    );
+    return await getStoredCredentials(userId);
   } catch (error) {
     console.error('Error getting user credentials:', error);
-    throw new Error('Failed to get user credentials');
+    return [];
   }
 }
 
-// Delete a credential
+// Delete a WebAuthn credential
 export async function deleteClerkCredential(credentialId: string): Promise<void> {
   try {
-    // Mock implementation - remove from localStorage for demo
-    const credentials = JSON.parse(localStorage.getItem('webauthn_credentials') || '{}');
-    delete credentials[credentialId];
-    localStorage.setItem('webauthn_credentials', JSON.stringify(credentials));
-  } catch (error) {
-    console.error('Error deleting credential:', error);
-    throw new Error('Failed to delete credential');
-  }
-}
+    const { error } = await supabase
+      .from('webauthn_credentials')
+      .delete()
+      .eq('credential_id', credentialId);
 
-// Helper function to generate mock challenge
-function generateMockChallenge(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return btoa(String.fromCharCode(...array));
+    if (error) {
+      console.error('Error deleting credential:', error);
+      throw new Error('Failed to delete credential');
+    }
+  } catch (error) {
+    console.error('Error deleting credential from Supabase:', error);
+    throw error;
+  }
 }
 
 // Hook to use Clerk auth with WebAuthn

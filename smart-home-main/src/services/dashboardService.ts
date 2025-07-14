@@ -1,15 +1,4 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  Timestamp 
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import {
   DashboardStats,
   Household,
@@ -167,13 +156,14 @@ export class DashboardService {
 
   private static async getHousehold(householdId: string): Promise<Household | null> {
     try {
-      const docRef = doc(db, 'households', householdId);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as Household;
-      }
-      return null;
+      const { data, error } = await supabase
+        .from('households')
+        .select('*')
+        .eq('id', householdId)
+        .single();
+
+      if (error) return null;
+      return data;
     } catch (error) {
       console.error('Error getting household:', error);
       return null;
@@ -182,15 +172,15 @@ export class DashboardService {
 
   private static async getRentPayments(householdId: string): Promise<RentPayment[]> {
     try {
-      const q = query(
-        collection(db, 'rentPayments'),
-        where('householdId', '==', householdId),
-        orderBy('dueDate', 'desc'),
-        limit(50)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as RentPayment);
+      const { data, error } = await supabase
+        .from('rent_payments')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('due_date', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting rent payments:', error);
       return [];
@@ -199,15 +189,15 @@ export class DashboardService {
 
   private static async getBills(householdId: string): Promise<Bill[]> {
     try {
-      const q = query(
-        collection(db, 'bills'),
-        where('householdId', '==', householdId),
-        orderBy('dueDate', 'desc'),
-        limit(50)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Bill);
+      const { data, error } = await supabase
+        .from('bills')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('due_date', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting bills:', error);
       return [];
@@ -216,15 +206,15 @@ export class DashboardService {
 
   private static async getChores(householdId: string): Promise<Chore[]> {
     try {
-      const q = query(
-        collection(db, 'chores'),
-        where('householdId', '==', householdId),
-        orderBy('createdAt', 'desc'),
-        limit(100)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Chore);
+      const { data, error } = await supabase
+        .from('chores')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting chores:', error);
       return [];
@@ -233,15 +223,15 @@ export class DashboardService {
 
   private static async getChoreCompletions(householdId: string): Promise<ChoreCompletion[]> {
     try {
-      const q = query(
-        collection(db, 'choreCompletions'),
-        where('householdId', '==', householdId),
-        orderBy('completedAt', 'desc'),
-        limit(100)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as ChoreCompletion);
+      const { data, error } = await supabase
+        .from('chore_completions')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('completed_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting chore completions:', error);
       return [];
@@ -250,15 +240,15 @@ export class DashboardService {
 
   private static async getConflictSessions(householdId: string): Promise<ConflictCoachSession[]> {
     try {
-      const q = query(
-        collection(db, 'conflictCoachSessions'),
-        where('householdId', '==', householdId),
-        orderBy('startedAt', 'desc'),
-        limit(50)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as ConflictCoachSession);
+      const { data, error } = await supabase
+        .from('conflict_coach_sessions')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('started_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting conflict sessions:', error);
       return [];
@@ -267,15 +257,15 @@ export class DashboardService {
 
   private static async getNudges(householdId: string): Promise<Nudge[]> {
     try {
-      const q = query(
-        collection(db, 'nudges'),
-        where('householdId', '==', householdId),
-        orderBy('createdAt', 'desc'),
-        limit(50)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Nudge);
+      const { data, error } = await supabase
+        .from('nudges')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting nudges:', error);
       return [];
@@ -326,15 +316,15 @@ export class DashboardService {
 
   static async getUserNotifications(userId: string): Promise<Notification[]> {
     try {
-      const q = query(
-        collection(db, 'notifications'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        limit(20)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Notification);
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting user notifications:', error);
       return [];
@@ -343,25 +333,20 @@ export class DashboardService {
 
   static async getHouseholdNudges(householdId: string, userId?: string): Promise<Nudge[]> {
     try {
-      let q = query(
-        collection(db, 'nudges'),
-        where('householdId', '==', householdId),
-        orderBy('createdAt', 'desc'),
-        limit(20)
-      );
+      let query = supabase
+        .from('nudges')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
       if (userId) {
-        q = query(
-          collection(db, 'nudges'),
-          where('householdId', '==', householdId),
-          where('targetUsers', 'array-contains', userId),
-          orderBy('createdAt', 'desc'),
-          limit(20)
-        );
+        query = query.contains('target_users', [userId]);
       }
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Nudge);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting household nudges:', error);
       return [];

@@ -1,39 +1,40 @@
-import { auth } from '@/lib/firebase';
-import { signInAnonymously, onAuthStateChanged, User } from 'firebase/auth';
+import { supabase } from '@/lib/supabase';
 
-// Sync Firebase auth with Clerk user
+// Supabase auth sync with Clerk user
 export const syncAuth = async (clerkUserId?: string) => {
   try {
-    // If we have a Clerk user, we can create a custom token
-    // For now, we'll use anonymous auth for development
-    if (!auth.currentUser) {
-      await signInAnonymously(auth);
-      console.log('Signed in to Firebase anonymously');
+    // For now, we'll use Supabase anonymous auth for development
+    // In production, you would sync Clerk user with Supabase auth
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('Error getting Supabase session:', error);
+    } else {
+      console.log('Supabase session retrieved');
     }
   } catch (error) {
-    console.error('Error signing in to Firebase:', error);
+    console.error('Error syncing auth:', error);
   }
 };
 
 // Listen for auth state changes
-export const setupAuthListener = (callback: (user: User | null) => void) => {
-  return onAuthStateChanged(auth, (user) => {
-    console.log('Firebase auth state changed:', user?.uid);
-    callback(user);
+export const setupAuthListener = (callback: (user: { id: string; email?: string } | null) => void) => {
+  return supabase.auth.onAuthStateChange((event, session) => {
+    console.log('Supabase auth state changed:', event, session?.user?.id);
+    callback(session?.user || null);
   });
 };
 
-// Get current Firebase user
-export const getCurrentFirebaseUser = () => {
-  return auth.currentUser;
+// Get current Supabase user
+export const getCurrentSupabaseUser = () => {
+  return supabase.auth.getUser();
 };
 
-// Sign out from Firebase
-export const signOutFirebase = async () => {
+// Sign out from Supabase
+export const signOutSupabase = async () => {
   try {
-    await auth.signOut();
-    console.log('Signed out from Firebase');
+    await supabase.auth.signOut();
+    console.log('Signed out from Supabase');
   } catch (error) {
-    console.error('Error signing out from Firebase:', error);
+    console.error('Error signing out from Supabase:', error);
   }
 }; 

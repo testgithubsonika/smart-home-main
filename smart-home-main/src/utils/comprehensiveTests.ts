@@ -1,7 +1,5 @@
 // Comprehensive testing utility for all project components
-import { db, storage } from '@/lib/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
-import { ref, listAll } from 'firebase/storage';
+import { supabase } from '@/lib/supabase';
 import { testModelsAccessibility } from './testModels';
 
 export interface TestResult {
@@ -13,8 +11,8 @@ export interface TestResult {
 }
 
 export interface ComprehensiveTestResults {
-  firebase: {
-    firestore: TestResult[];
+  supabase: {
+    database: TestResult[];
     storage: TestResult[];
   };
   models: TestResult[];
@@ -28,45 +26,76 @@ export interface ComprehensiveTestResults {
   };
 }
 
-// Test Firebase Firestore
-export const testFirestore = async (): Promise<TestResult[]> => {
+// Test Supabase Database
+export const testSupabaseDatabase = async (): Promise<TestResult[]> => {
   const results: TestResult[] = [];
   
   // Test 1: Basic connection
   try {
-    const testCollection = collection(db, 'test');
-    await getDocs(testCollection);
+    const { data, error } = await supabase
+      .from('households')
+      .select('count')
+      .limit(1);
+    
+    if (error) {
+      throw error;
+    }
+    
     results.push({
-      name: 'Firestore Connection',
+      name: 'Supabase Database Connection',
       success: true,
-      details: 'Successfully connected to Firestore',
+      details: 'Successfully connected to Supabase Database',
       timestamp: new Date()
     });
   } catch (error) {
     results.push({
-      name: 'Firestore Connection',
+      name: 'Supabase Database Connection',
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date()
     });
   }
 
-  // Test 2: Check collections
-  const collectionsToTest = ['users', 'households', 'listings', 'floorPlans', 'chores', 'bills', 'rentPayments'];
+  // Test 2: Check tables
+  const tablesToTest = [
+    'households',
+    'rent_payments',
+    'rent_schedules',
+    'bills',
+    'chores',
+    'chore_completions',
+    'sensors',
+    'sensor_events',
+    'nudges',
+    'chat_messages',
+    'conflict_analyses',
+    'conflict_coach_sessions',
+    'notifications',
+    'household_settings',
+    'location_verifications',
+    'webauthn_credentials'
+  ];
   
-  for (const collectionName of collectionsToTest) {
+  for (const tableName of tablesToTest) {
     try {
-      const collectionRef = collection(db, collectionName);
-      const snapshot = await getDocs(collectionRef);
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .limit(1);
+      
+      if (error) {
+        throw error;
+      }
+      
       results.push({
-        name: `Firestore Collection: ${collectionName}`,
+        name: `Supabase Table: ${tableName}`,
         success: true,
-        details: `${snapshot.size} documents found`,
+        details: 'Table accessible',
         timestamp: new Date()
       });
     } catch (error) {
       results.push({
-        name: `Firestore Collection: ${collectionName}`,
+        name: `Supabase Table: ${tableName}`,
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date()
@@ -77,23 +106,29 @@ export const testFirestore = async (): Promise<TestResult[]> => {
   return results;
 };
 
-// Test Firebase Storage
-export const testFirebaseStorage = async (): Promise<TestResult[]> => {
+// Test Supabase Storage
+export const testSupabaseStorage = async (): Promise<TestResult[]> => {
   const results: TestResult[] = [];
   
   // Test 1: Basic connection
   try {
-    const testRef = ref(storage, 'test');
-    await listAll(testRef);
+    const { data, error } = await supabase.storage
+      .from('test')
+      .list();
+    
+    if (error) {
+      throw error;
+    }
+    
     results.push({
-      name: 'Firebase Storage Connection',
+      name: 'Supabase Storage Connection',
       success: true,
-      details: 'Successfully connected to Firebase Storage',
+      details: 'Successfully connected to Supabase Storage',
       timestamp: new Date()
     });
   } catch (error) {
     results.push({
-      name: 'Firebase Storage Connection',
+      name: 'Supabase Storage Connection',
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date()
@@ -105,12 +140,18 @@ export const testFirebaseStorage = async (): Promise<TestResult[]> => {
   
   for (const bucket of bucketsToTest) {
     try {
-      const bucketRef = ref(storage, bucket);
-      const items = await listAll(bucketRef);
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .list();
+      
+      if (error) {
+        throw error;
+      }
+      
       results.push({
         name: `Storage Bucket: ${bucket}`,
         success: true,
-        details: `${items.items.length} items found`,
+        details: `${data?.length || 0} items found`,
         timestamp: new Date()
       });
     } catch (error) {
@@ -383,9 +424,9 @@ export const runComprehensiveTests = async (): Promise<ComprehensiveTestResults>
   const startTime = Date.now();
   
   // Run all test suites
-  const [firestoreResults, storageResults, modelResults, apiResults, componentResults] = await Promise.all([
-    testFirestore(),
-    testFirebaseStorage(),
+  const [databaseResults, storageResults, modelResults, apiResults, componentResults] = await Promise.all([
+    testSupabaseDatabase(),
+    testSupabaseStorage(),
     testModels(),
     testAPIs(),
     testComponents()
@@ -393,7 +434,7 @@ export const runComprehensiveTests = async (): Promise<ComprehensiveTestResults>
 
   // Calculate overall results
   const allResults = [
-    ...firestoreResults,
+    ...databaseResults,
     ...storageResults,
     ...modelResults,
     ...apiResults,
@@ -406,8 +447,8 @@ export const runComprehensiveTests = async (): Promise<ComprehensiveTestResults>
   const overallSuccess = failedTests === 0;
 
   const results: ComprehensiveTestResults = {
-    firebase: {
-      firestore: firestoreResults,
+    supabase: {
+      database: databaseResults,
       storage: storageResults
     },
     models: modelResults,

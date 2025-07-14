@@ -1,21 +1,5 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  onSnapshot,
-  Timestamp,
-  serverTimestamp
-} from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+// Firebase imports removed - using Supabase service instead
+import { supabase } from '@/lib/supabase';
 
 export interface FloorPlan {
   id: string;
@@ -27,8 +11,8 @@ export interface FloorPlan {
   description?: string;
   fileSize?: number;
   fileType?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateFloorPlanData {
@@ -48,26 +32,41 @@ export interface UpdateFloorPlanData {
 // Create a new floor plan
 export const createFloorPlan = async (data: CreateFloorPlanData): Promise<string> => {
   try {
-    // Upload file to Firebase Storage
-    const storageRef = ref(storage, `floorplans/${data.householdId}/${data.file.name}`);
-    const snapshot = await uploadBytes(storageRef, data.file);
-    const fileUrl = await getDownloadURL(snapshot.ref);
+    // Upload file to Supabase Storage
+    const filePath = `floorplans/${data.householdId}/${data.file.name}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('floorplans')
+      .upload(filePath, data.file);
 
-    // Create document in Firestore
-    const floorPlanData: Omit<FloorPlan, 'id'> = {
-      householdId: data.householdId,
-      userId: data.userId,
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage
+      .from('floorplans')
+      .getPublicUrl(filePath);
+
+    const fileUrl = urlData.publicUrl;
+
+    // Create document in Supabase
+    const floorPlanData = {
+      household_id: data.householdId,
+      user_id: data.userId,
       name: data.name,
-      fileUrl,
+      file_url: fileUrl,
       description: data.description,
-      fileSize: data.file.size,
-      fileType: data.file.type,
-      createdAt: serverTimestamp() as Timestamp,
-      updatedAt: serverTimestamp() as Timestamp,
+      file_size: data.file.size,
+      file_type: data.file.type,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    const docRef = await addDoc(collection(db, 'floorPlans'), floorPlanData);
-    return docRef.id;
+    const { data: insertData, error: insertError } = await supabase
+      .from('floor_plans')
+      .insert(floorPlanData)
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+    return insertData.id;
   } catch (error) {
     console.error('Error creating floor plan:', error);
     throw new Error('Failed to create floor plan');
@@ -77,11 +76,28 @@ export const createFloorPlan = async (data: CreateFloorPlanData): Promise<string
 // Get floor plan by ID
 export const getFloorPlan = async (floorPlanId: string): Promise<FloorPlan | null> => {
   try {
-    const docRef = doc(db, 'floorPlans', floorPlanId);
-    const docSnap = await getDoc(docRef);
+    const { data, error } = await supabase
+      .from('floor_plans')
+      .select('*')
+      .eq('id', floorPlanId)
+      .single();
 
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as FloorPlan;
+    if (error) return null;
+
+    if (data) {
+      return {
+        id: data.id,
+        householdId: data.household_id,
+        userId: data.user_id,
+        name: data.name,
+        fileUrl: data.file_url,
+        thumbnailUrl: data.thumbnail_url,
+        description: data.description,
+        fileSize: data.file_size,
+        fileType: data.file_type,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      } as FloorPlan;
     }
     return null;
   } catch (error) {
@@ -93,20 +109,27 @@ export const getFloorPlan = async (floorPlanId: string): Promise<FloorPlan | nul
 // Get floor plans by household ID
 export const getFloorPlansByHousehold = async (householdId: string): Promise<FloorPlan[]> => {
   try {
-    const q = query(
-      collection(db, 'floorPlans'),
-      where('householdId', '==', householdId),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const floorPlans: FloorPlan[] = [];
-    
-    querySnapshot.forEach((doc) => {
-      floorPlans.push({ id: doc.id, ...doc.data() } as FloorPlan);
-    });
-    
-    return floorPlans;
+    const { data, error } = await supabase
+      .from('floor_plans')
+      .select('*')
+      .eq('household_id', householdId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      id: item.id,
+      householdId: item.household_id,
+      userId: item.user_id,
+      name: item.name,
+      fileUrl: item.file_url,
+      thumbnailUrl: item.thumbnail_url,
+      description: item.description,
+      fileSize: item.file_size,
+      fileType: item.file_type,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    })) as FloorPlan[];
   } catch (error) {
     console.error('Error getting floor plans by household:', error);
     throw new Error('Failed to get floor plans');
@@ -116,20 +139,27 @@ export const getFloorPlansByHousehold = async (householdId: string): Promise<Flo
 // Get floor plans by user ID
 export const getFloorPlansByUser = async (userId: string): Promise<FloorPlan[]> => {
   try {
-    const q = query(
-      collection(db, 'floorPlans'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const floorPlans: FloorPlan[] = [];
-    
-    querySnapshot.forEach((doc) => {
-      floorPlans.push({ id: doc.id, ...doc.data() } as FloorPlan);
-    });
-    
-    return floorPlans;
+    const { data, error } = await supabase
+      .from('floor_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      id: item.id,
+      householdId: item.household_id,
+      userId: item.user_id,
+      name: item.name,
+      fileUrl: item.file_url,
+      thumbnailUrl: item.thumbnail_url,
+      description: item.description,
+      fileSize: item.file_size,
+      fileType: item.file_type,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    })) as FloorPlan[];
   } catch (error) {
     console.error('Error getting floor plans by user:', error);
     throw new Error('Failed to get floor plans');
@@ -139,9 +169,8 @@ export const getFloorPlansByUser = async (userId: string): Promise<FloorPlan[]> 
 // Update floor plan
 export const updateFloorPlan = async (floorPlanId: string, data: UpdateFloorPlanData): Promise<void> => {
   try {
-    const docRef = doc(db, 'floorPlans', floorPlanId);
-    const updateData: Partial<FloorPlan> = {
-      updatedAt: serverTimestamp() as Timestamp,
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
     };
 
     if (data.name) updateData.name = data.name;
@@ -155,24 +184,40 @@ export const updateFloorPlan = async (floorPlanId: string, data: UpdateFloorPlan
       // Delete old file from storage
       if (floorPlan.fileUrl) {
         try {
-          const oldFileRef = ref(storage, floorPlan.fileUrl);
-          await deleteObject(oldFileRef);
+          const filePath = floorPlan.fileUrl.split('/').pop(); // Extract filename from URL
+          if (filePath) {
+            await supabase.storage
+              .from('floorplans')
+              .remove([`${floorPlan.householdId}/${filePath}`]);
+          }
         } catch (error) {
           console.warn('Failed to delete old file:', error);
         }
       }
 
       // Upload new file
-      const storageRef = ref(storage, `floorplans/${floorPlan.householdId}/${data.file.name}`);
-      const snapshot = await uploadBytes(storageRef, data.file);
-      const fileUrl = await getDownloadURL(snapshot.ref);
+      const filePath = `floorplans/${floorPlan.householdId}/${data.file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('floorplans')
+        .upload(filePath, data.file);
 
-      updateData.fileUrl = fileUrl;
-      updateData.fileSize = data.file.size;
-      updateData.fileType = data.file.type;
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('floorplans')
+        .getPublicUrl(filePath);
+
+      updateData.file_url = urlData.publicUrl;
+      updateData.file_size = data.file.size;
+      updateData.file_type = data.file.type;
     }
 
-    await updateDoc(docRef, updateData);
+    const { error } = await supabase
+      .from('floor_plans')
+      .update(updateData)
+      .eq('id', floorPlanId);
+
+    if (error) throw error;
   } catch (error) {
     console.error('Error updating floor plan:', error);
     throw new Error('Failed to update floor plan');
@@ -188,15 +233,24 @@ export const deleteFloorPlan = async (floorPlanId: string): Promise<void> => {
     // Delete file from storage
     if (floorPlan.fileUrl) {
       try {
-        const fileRef = ref(storage, floorPlan.fileUrl);
-        await deleteObject(fileRef);
+        const filePath = floorPlan.fileUrl.split('/').pop(); // Extract filename from URL
+        if (filePath) {
+          await supabase.storage
+            .from('floorplans')
+            .remove([`${floorPlan.householdId}/${filePath}`]);
+        }
       } catch (error) {
         console.warn('Failed to delete file from storage:', error);
       }
     }
 
-    // Delete document from Firestore
-    await deleteDoc(doc(db, 'floorPlans', floorPlanId));
+    // Delete document from Supabase
+    const { error } = await supabase
+      .from('floor_plans')
+      .delete()
+      .eq('id', floorPlanId);
+
+    if (error) throw error;
   } catch (error) {
     console.error('Error deleting floor plan:', error);
     throw new Error('Failed to delete floor plan');
@@ -208,27 +262,40 @@ export const subscribeToFloorPlans = (
   householdId: string,
   callback: (floorPlans: FloorPlan[]) => void
 ) => {
-  const q = query(
-    collection(db, 'floorPlans'),
-    where('householdId', '==', householdId),
-    orderBy('createdAt', 'desc')
-  );
-
-  return onSnapshot(q, (querySnapshot) => {
-    const floorPlans: FloorPlan[] = [];
-    querySnapshot.forEach((doc) => {
-      floorPlans.push({ id: doc.id, ...doc.data() } as FloorPlan);
-    });
-    callback(floorPlans);
-  });
+  return supabase
+    .channel(`floor-plans-${householdId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'floor_plans',
+        filter: `household_id=eq.${householdId}`,
+      },
+      async () => {
+        // Refetch floor plans when there are changes
+        const floorPlans = await getFloorPlansByHousehold(householdId);
+        callback(floorPlans);
+      }
+    )
+    .subscribe();
 };
 
 // Upload floor plan file and get URL
 export const uploadFloorPlanFile = async (file: File, householdId: string): Promise<string> => {
   try {
-    const storageRef = ref(storage, `floorplans/${householdId}/${file.name}`);
-    const snapshot = await uploadBytes(storageRef, file);
-    return await getDownloadURL(snapshot.ref);
+    const filePath = `floorplans/${householdId}/${file.name}`;
+    const { data, error } = await supabase.storage
+      .from('floorplans')
+      .upload(filePath, file);
+
+    if (error) throw error;
+
+    const { data: urlData } = supabase.storage
+      .from('floorplans')
+      .getPublicUrl(filePath);
+
+    return urlData.publicUrl;
   } catch (error) {
     console.error('Error uploading floor plan file:', error);
     throw new Error('Failed to upload floor plan file');

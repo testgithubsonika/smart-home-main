@@ -13,3 +13,316 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// WebAuthn Credentials Table
+model WebAuthnCredential {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  credentialId  String   @unique @map("credential_id")
+  publicKey     String   @map("public_key")
+  signCount     Int      @default(0) @map("sign_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("webauthn_credentials")
+}
+
+// Harmony System Tables
+model Household {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  description String?
+  rentAmount  Float?   @map("rent_amount")
+  rentDueDay  Int?     @map("rent_due_day")
+  memberIds   String[] @map("member_ids")
+  adminId     String   @map("admin_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  rentPayments    RentPayment[]
+  rentSchedules   RentSchedule[]
+  bills           Bill[]
+  chores          Chore[]
+  sensors         Sensor[]
+  nudges          Nudge[]
+  chatMessages    ChatMessage[]
+  conflictAnalyses ConflictAnalysis[]
+  conflictCoachSessions ConflictCoachSession[]
+  notifications   Notification[]
+  householdSettings HouseholdSettings?
+
+  @@map("households")
+}
+
+model RentPayment {
+  id          String    @id @default(cuid())
+  householdId String    @map("household_id")
+  userId      String    @map("user_id")
+  amount      Float
+  dueDate     DateTime  @map("due_date")
+  paidDate    DateTime? @map("paid_date")
+  status      String    // 'pending' | 'paid' | 'overdue' | 'partial'
+  method      String?   // 'bank_transfer' | 'cash' | 'check' | 'digital'
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("rent_payments")
+}
+
+model RentSchedule {
+  id            String    @id @default(cuid())
+  householdId   String    @map("household_id")
+  monthlyAmount Float     @map("monthly_amount")
+  dueDay        Int       @map("due_day")
+  splitType     String    @map("split_type") // 'equal' | 'percentage' | 'fixed_amounts'
+  splits        Json      // Array of { userId: string, amount: number, percentage?: number }
+  startDate     DateTime  @map("start_date")
+  endDate       DateTime? @map("end_date")
+  isActive      Boolean   @default(true) @map("is_active")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("rent_schedules")
+}
+
+model Bill {
+  id            String    @id @default(cuid())
+  householdId   String    @map("household_id")
+  name          String
+  amount        Float
+  dueDate       DateTime  @map("due_date")
+  paidDate      DateTime? @map("paid_date")
+  status        String    // 'pending' | 'paid' | 'overdue'
+  category      String    // 'electricity' | 'water' | 'gas' | 'internet' | 'trash' | 'other'
+  paidBy        String?   @map("paid_by")
+  splitBetween  String[]  @map("split_between")
+  receiptUrl    String?   @map("receipt_url")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("bills")
+}
+
+model Chore {
+  id            String    @id @default(cuid())
+  householdId   String    @map("household_id")
+  title         String
+  description   String?
+  assignedTo    String?   @map("assigned_to")
+  assignedBy    String?   @map("assigned_by")
+  dueDate       DateTime? @map("due_date")
+  completedDate DateTime? @map("completed_date")
+  status        String    // 'pending' | 'in_progress' | 'completed' | 'overdue'
+  priority      String    // 'low' | 'medium' | 'high'
+  category      String    // 'cleaning' | 'maintenance' | 'shopping' | 'cooking' | 'other'
+  points        Int
+  recurring     Json?     // { frequency: 'daily' | 'weekly' | 'monthly', interval: number }
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  household        Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  choreCompletions ChoreCompletion[]
+
+  @@map("chores")
+}
+
+model ChoreCompletion {
+  id           String    @id @default(cuid())
+  choreId      String    @map("chore_id")
+  userId       String    @map("user_id")
+  completedAt  DateTime  @map("completed_at")
+  verifiedBy   String?   @map("verified_by")
+  pointsEarned Int       @map("points_earned")
+  notes        String?
+
+  // Relations
+  chore Chore @relation(fields: [choreId], references: [id], onDelete: Cascade)
+
+  @@map("chore_completions")
+}
+
+model Sensor {
+  id          String    @id @default(cuid())
+  householdId String    @map("household_id")
+  name        String
+  type        String    // 'motion' | 'door' | 'trash' | 'dishwasher' | 'washer' | 'dryer' | 'temperature' | 'humidity'
+  location    String
+  isActive    Boolean   @default(true) @map("is_active")
+  lastReading Json?     @map("last_reading") // { value: unknown, timestamp: Date }
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  household     Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  sensorEvents  SensorEvent[]
+
+  @@map("sensors")
+}
+
+model SensorEvent {
+  id        String   @id @default(cuid())
+  sensorId  String   @map("sensor_id")
+  type      String   // Event type
+  timestamp DateTime
+  data      Json     // Event data
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+
+  @@map("sensor_events")
+}
+
+model Nudge {
+  id           String    @id @default(cuid())
+  householdId  String    @map("household_id")
+  title        String
+  message      String
+  type         String    // 'chore_reminder' | 'bill_due' | 'rent_due' | 'sensor_triggered' | 'conflict_warning'
+  priority     String    // 'low' | 'medium' | 'high'
+  targetUsers  String[]  @map("target_users")
+  isRead       Boolean   @default(false) @map("is_read")
+  isDismissed  Boolean   @default(false) @map("is_dismissed")
+  expiresAt    DateTime? @map("expires_at")
+  actionUrl    String?   @map("action_url")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("nudges")
+}
+
+model ChatMessage {
+  id          String    @id @default(cuid())
+  householdId String    @map("household_id")
+  userId      String    @map("user_id")
+  content     String
+  timestamp   DateTime
+  sentiment   String?   // 'positive' | 'neutral' | 'negative'
+  isEdited    Boolean   @default(false) @map("is_edited")
+  editedAt    DateTime? @map("edited_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model ConflictAnalysis {
+  id               String   @id @default(cuid())
+  householdId      String   @map("household_id")
+  triggerMessageId String   @map("trigger_message_id")
+  analysis         Json     // { sentiment: string, severity: string, topics: string[], suggestions: string[] }
+  isResolved       Boolean  @default(false) @map("is_resolved")
+  resolvedAt       DateTime? @map("resolved_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("conflict_analyses")
+}
+
+model ConflictCoachSession {
+  id           String   @id @default(cuid())
+  householdId  String   @map("household_id")
+  participants String[] // User IDs
+  topic        String
+  status       String   // 'active' | 'completed' | 'cancelled'
+  messages     Json     // Array of { role: string, content: string, timestamp: Date }
+  suggestions  String[]
+  startedAt    DateTime @map("started_at")
+  endedAt      DateTime? @map("ended_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("conflict_coach_sessions")
+}
+
+model Notification {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  householdId  String   @map("household_id")
+  type         String   // 'rent_due' | 'bill_due' | 'chore_assigned' | 'chore_completed' | 'conflict_detected' | 'nudge_received'
+  title        String
+  message      String
+  isRead       Boolean  @default(false) @map("is_read")
+  actionUrl    String?  @map("action_url")
+  metadata     Json?    // Additional data
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model HouseholdSettings {
+  id                 String   @id @default(cuid())
+  householdId        String   @unique @map("household_id")
+  rentSettings       Json     @map("rent_settings") // { split_method: string, grace_period: number, late_fees: number }
+  choreSettings      Json     @map("chore_settings") // { point_system: boolean, auto_assign: boolean, reminder_frequency: string }
+  notificationSettings Json   @map("notification_settings") // { email_notifications: boolean, push_notifications: boolean, quiet_hours: object }
+  conflictResolution Json     @map("conflict_resolution") // { auto_coach_enabled: boolean, sentiment_threshold: number, escalation_delay: number }
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@map("household_settings")
+}
+
+model LocationVerification {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  listingId         String?  @map("listing_id")
+  verificationData  Json     @map("verification_data") // LocationVerificationData interface
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("location_verifications")
+}
+
+model IdentityVerification {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  verified    Boolean  @default(false)
+  verifiedAt  DateTime? @map("verified_at")
+  method      String?  // 'face_match' | 'id_scan' | 'manual'
+  metadata    Json?    // Additional verification data
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("identity_verifications")
+}
+
+model FloorPlan {
+  id            String   @id @default(cuid())
+  householdId   String   @map("household_id")
+  userId        String   @map("user_id")
+  name          String
+  fileUrl       String   @map("file_url")
+  thumbnailUrl  String?  @map("thumbnail_url")
+  metadata      Json?    // Additional floor plan data
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("floor_plans")
+}

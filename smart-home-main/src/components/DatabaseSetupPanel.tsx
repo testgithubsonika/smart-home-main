@@ -117,7 +117,7 @@ export const DatabaseSetupPanel: React.FC = () => {
           Database Setup
         </CardTitle>
         <CardDescription>
-          Initialize your Firestore database with sample data for testing and development
+          Initialize your Supabase database with sample data for testing and development
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -257,7 +257,7 @@ export const DatabaseSetupPanel: React.FC = () => {
           <h4 className="font-medium mb-2">Instructions</h4>
           <ul className="text-sm space-y-1 text-muted-foreground">
             <li>• <strong>Setup Database:</strong> Creates all necessary collections with sample data</li>
-            <li>• <strong>Clear Database:</strong> Removes all data from Firestore collections</li>
+                          <li>• <strong>Clear Database:</strong> Removes all data from Supabase tables</li>
             <li>• <strong>Check Status:</strong> Verifies if the database has data</li>
             <li>• Sample data includes users, households, bills, chores, sensors, and more</li>
             <li>• This is for development/testing purposes only</li>

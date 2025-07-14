@@ -116,7 +116,14 @@ export const LoginPage: React.FC = () => {
   };
 
   // Handle fingerprint authentication success
-  const handleFingerprintSuccess = (user: any) => {
+  interface FingerprintUser {
+    id: string;
+    email: string;
+    name: string;
+    // Add other user properties as needed
+  }
+
+  const handleFingerprintSuccess = (user: FingerprintUser) => {
     localStorage.setItem('user', JSON.stringify(user));
     toast.success('Fingerprint authentication successful!');
     navigate('/dashboard');

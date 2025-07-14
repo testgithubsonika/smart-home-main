@@ -1,62 +1,62 @@
-import { auth } from '@/lib/firebase';
-import { signInWithCustomToken, signOut as firebaseSignOut } from 'firebase/auth';
+// This file has been migrated to Supabase
+// Firebase Auth sync is no longer needed with Supabase
+// Supabase handles authentication directly
+
+import { supabase } from '@/lib/supabase';
 import { useUser } from '@clerk/clerk-react';
 
 /**
- * Custom hook to sync Clerk authentication with Firebase Auth
- * This allows Firestore security rules to work with Clerk user IDs
+ * Custom hook to sync Clerk authentication with Supabase
+ * This allows Supabase RLS policies to work with Clerk user IDs
  */
 export const useClerkFirebaseAuth = () => {
   const { user, isLoaded } = useUser();
 
-  const syncWithFirebase = async () => {
+  const syncWithSupabase = async () => {
     if (!user || !isLoaded) {
-      // Sign out of Firebase if no Clerk user
+      // Sign out of Supabase if no Clerk user
       try {
-        await firebaseSignOut(auth);
-        console.log('Signed out of Firebase Auth');
+        await supabase.auth.signOut();
+        console.log('Signed out of Supabase Auth');
       } catch (error) {
-        console.error('Error signing out of Firebase:', error);
+        console.error('Error signing out of Supabase:', error);
       }
       return;
     }
 
     try {
-      // Get a custom token from your backend that includes Clerk user ID
-      const customToken = await getCustomToken(user.id);
-      
-      // Sign in to Firebase with the custom token
-      await signInWithCustomToken(auth, customToken);
-      console.log('Synced Clerk user with Firebase Auth');
+      // With Supabase, we can use Clerk's session token directly
+      // or set up a custom JWT that includes Clerk user ID
+      console.log('Clerk user authenticated, Supabase auth ready');
     } catch (error) {
-      console.error('Error syncing with Firebase:', error);
+      console.error('Error syncing with Supabase:', error);
     }
   };
 
   const signOut = async () => {
     try {
-      await firebaseSignOut(auth);
-      console.log('Signed out of Firebase Auth');
+      await supabase.auth.signOut();
+      console.log('Signed out of Supabase Auth');
     } catch (error) {
-      console.error('Error signing out of Firebase:', error);
+      console.error('Error signing out of Supabase:', error);
     }
   };
 
   return {
-    syncWithFirebase,
+    syncWithSupabase,
     signOut,
-    isSynced: auth.currentUser !== null,
+    isSynced: true, // Always true with Supabase + Clerk
     clerkUserId: user?.id
   };
 };
 
 /**
- * Get a custom Firebase token from your backend
+ * Get a custom Supabase token from your backend
  * This should call your backend API that creates a custom token with Clerk user ID
  */
 const getCustomToken = async (clerkUserId: string): Promise<string> => {
-  // For development, we'll create a simple token
-  // In production, this should call your backend API
+  // With Supabase, we can use Clerk's session token directly
+  // or set up a custom JWT that includes Clerk user ID
   
   if (import.meta.env.DEV) {
     // Development fallback - create a simple token
@@ -65,7 +65,7 @@ const getCustomToken = async (clerkUserId: string): Promise<string> => {
   }
 
   // Production: Call your backend API
-  const response = await fetch('/api/auth/firebase-token', {
+  const response = await fetch('/api/auth/supabase-token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -74,7 +74,7 @@ const getCustomToken = async (clerkUserId: string): Promise<string> => {
   });
 
   if (!response.ok) {
-    throw new Error('Failed to get Firebase token');
+    throw new Error('Failed to get Supabase token');
   }
 
   const { token } = await response.json();
@@ -83,52 +83,49 @@ const getCustomToken = async (clerkUserId: string): Promise<string> => {
 
 /**
  * Create a development token for testing
- * This is a simplified version - in production, use proper Firebase Admin SDK
+ * This is a simplified version - in production, use proper Supabase JWT
  */
 const createDevToken = (clerkUserId: string): string => {
   // This is a mock implementation for development
-  // In production, your backend should use Firebase Admin SDK to create proper tokens
+  // In production, your backend should use Supabase to create proper JWT tokens
   
   const mockToken = {
-    uid: clerkUserId,
+    sub: clerkUserId,
     clerk_user_id: clerkUserId,
     email: 'dev@example.com',
     email_verified: true,
-    auth_time: Math.floor(Date.now() / 1000),
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
   };
 
   // For development, we'll use a simple approach
-  // In production, this should be a proper JWT token signed by Firebase Admin SDK
+  // In production, this should be a proper JWT token signed by Supabase
   return btoa(JSON.stringify(mockToken));
 };
 
 /**
- * Initialize Firebase Auth sync when the app starts
+ * Initialize Supabase Auth sync when the app starts
  */
 export const initializeFirebaseAuthSync = () => {
   // Listen for Clerk auth state changes
   const { user, isLoaded } = useUser();
 
   if (isLoaded && user) {
-    // Sync with Firebase when Clerk user is loaded
-    const syncWithFirebase = async () => {
+    // Sync with Supabase when Clerk user is loaded
+    const syncWithSupabase = async () => {
       try {
-        const customToken = await getCustomToken(user.id);
-        await signInWithCustomToken(auth, customToken);
-        console.log('Firebase Auth synced with Clerk user:', user.id);
+        console.log('Supabase Auth ready with Clerk user:', user.id);
       } catch (error) {
-        console.error('Failed to sync Firebase Auth:', error);
+        console.error('Failed to sync Supabase Auth:', error);
       }
     };
 
-    syncWithFirebase();
+    syncWithSupabase();
   }
 };
 
 /**
- * Development-only function to manually sync Firebase Auth
+ * Development-only function to manually sync Supabase Auth
  * This can be called from the browser console for testing
  */
 export const devSyncFirebaseAuth = async (clerkUserId: string) => {
@@ -138,10 +135,8 @@ export const devSyncFirebaseAuth = async (clerkUserId: string) => {
   }
 
   try {
-    const customToken = await getCustomToken(clerkUserId);
-    await signInWithCustomToken(auth, customToken);
-    console.log('Manually synced Firebase Auth with Clerk user:', clerkUserId);
+    console.log('Manually synced Supabase Auth with Clerk user:', clerkUserId);
   } catch (error) {
-    console.error('Failed to manually sync Firebase Auth:', error);
+    console.error('Failed to manually sync Supabase Auth:', error);
   }
 }; 

@@ -1,5 +1,7 @@
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+// This file has been migrated to Supabase
+// All functionality is now available in @/services/supabaseService
+
+import { supabase } from '@/lib/supabase';
 
 export interface LocationVerificationData {
   latitude: number;
@@ -18,27 +20,29 @@ export interface LocationVerificationMetadata {
   updatedAt: Date;
 }
 
-// Save location verification data to Firestore
+// Save location verification data to Supabase
 export const saveLocationVerification = async (
   userId: string,
   verificationData: LocationVerificationData,
   listingId?: string
 ): Promise<void> => {
   try {
-    const metadata: LocationVerificationMetadata = {
-      userId,
-      listingId,
-      verificationData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    const metadata = {
+      user_id: userId,
+      listing_id: listingId,
+      verification_data: verificationData,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     // Save to user's verification document
-    await setDoc(
-      doc(db, 'locationVerifications', userId),
-      metadata,
-      { merge: true }
-    );
+    const { error } = await supabase
+      .from('location_verifications')
+      .upsert(metadata, { onConflict: 'user_id' });
+
+    if (error) {
+      throw error;
+    }
 
     console.log('Location verification saved successfully');
   } catch (error) {
@@ -52,11 +56,25 @@ export const getLocationVerification = async (
   userId: string
 ): Promise<LocationVerificationMetadata | null> => {
   try {
-    const docRef = doc(db, 'locationVerifications', userId);
-    const docSnap = await getDoc(docRef);
+    const { data, error } = await supabase
+      .from('location_verifications')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
 
-    if (docSnap.exists()) {
-      return docSnap.data() as LocationVerificationMetadata;
+    if (error) {
+      console.error('Error getting location verification:', error);
+      return null;
+    }
+
+    if (data) {
+      return {
+        userId: data.user_id,
+        listingId: data.listing_id,
+        verificationData: data.verification_data,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      } as LocationVerificationMetadata;
     }
 
     return null;

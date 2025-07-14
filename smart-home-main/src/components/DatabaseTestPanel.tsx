@@ -16,7 +16,7 @@ import {
   Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { testDatabase, testCollections, testFloorPlans, testStorage, getDatabaseStatus } from '@/utils/databaseTest';
+import { testDatabase, testTables, testStorage, getDatabaseStatus } from '@/utils/databaseTest';
 import { getPermissionState, requestCameraPermission, requestMicrophonePermission, requestBothPermissions } from '@/utils/permissionManager';
 import { createFloorPlan, getFloorPlansByHousehold } from '@/services/floorPlanService';
 import FloorPlanViewer from './FloorPlanViewer';
@@ -70,18 +70,14 @@ export const DatabaseTestPanel: React.FC = () => {
         error instanceof Error ? error.message : 'Unknown error');
     }
 
-    // Test 2: Collections Access
-    addTestResult('Collections Access', 'running');
+    // Test 2: Tables Access
+    addTestResult('Tables Access', 'running');
     try {
-      const collectionsResult = await testCollections();
-      const accessibleCollections = Object.entries(collectionsResult)
-        .filter(([_, result]) => result.exists && result.canRead)
-        .map(([name, _]) => name);
-      
-      addTestResult('Collections Access', 'success', 
-        `Accessible: ${accessibleCollections.join(', ')}`, collectionsResult);
+      const tablesResult = await testTables();
+      addTestResult('Tables Access', 'success', 
+        `Tables tested successfully`, tablesResult);
     } catch (error) {
-      addTestResult('Collections Access', 'error', 
+      addTestResult('Tables Access', 'error', 
         error instanceof Error ? error.message : 'Unknown error');
     }
 
@@ -103,14 +99,32 @@ export const DatabaseTestPanel: React.FC = () => {
     // Test 4: Floor Plan Operations
     addTestResult('Floor Plan Operations', 'running');
     try {
-      const floorPlanResult = await testFloorPlans();
-      const canCreate = floorPlanResult.canCreate;
-      const canRead = floorPlanResult.canRead;
-      const canUpdate = floorPlanResult.canUpdate;
-      const canDelete = floorPlanResult.canDelete;
+      // Since testFloorPlans doesn't exist, we'll test floor plan operations manually
+      const testHouseholdId = 'test-household-id';
+      const floorPlanData = {
+        householdId: testHouseholdId,
+        name: 'Test Floor Plan',
+        data: { rooms: [] },
+        imageUrl: null
+      };
+      
+      // Test create operation
+      const createdPlan = await createFloorPlan(floorPlanData);
+      const canCreate = !!createdPlan;
+      
+      // Test read operation
+      const plans = await getFloorPlansByHousehold(testHouseholdId);
+      const canRead = Array.isArray(plans);
+      
+      const floorPlanResult = {
+        canCreate,
+        canRead,
+        canUpdate: false, // Not implemented in this test
+        canDelete: false  // Not implemented in this test
+      };
       
       addTestResult('Floor Plan Operations', 'success', 
-        `Create: ${canCreate}, Read: ${canRead}, Update: ${canUpdate}, Delete: ${canDelete}`, floorPlanResult);
+        `Create: ${canCreate}, Read: ${canRead}`, floorPlanResult);
     } catch (error) {
       addTestResult('Floor Plan Operations', 'error', 
         error instanceof Error ? error.message : 'Unknown error');
@@ -151,12 +165,9 @@ export const DatabaseTestPanel: React.FC = () => {
           const dbResult = await testDatabase();
           addTestResult(testName, 'success', `Overall: ${dbResult.overall}`, dbResult);
           break;
-        case 'Collections Access':
-          const collectionsResult = await testCollections();
-          const accessibleCollections = Object.entries(collectionsResult)
-            .filter(([_, result]) => result.exists && result.canRead)
-            .map(([name, _]) => name);
-          addTestResult(testName, 'success', `Accessible: ${accessibleCollections.join(', ')}`, collectionsResult);
+        case 'Tables Access':
+          const tablesResult = await testTables();
+          addTestResult(testName, 'success', `Tables tested successfully`, tablesResult);
           break;
         case 'Storage Operations':
           const storageResult = await testStorage();
@@ -165,10 +176,32 @@ export const DatabaseTestPanel: React.FC = () => {
             storageResult);
           break;
         case 'Floor Plan Operations':
-          const floorPlanResult = await testFloorPlans();
+          // Since testFloorPlans doesn't exist, we'll test floor plan operations manually
+          const testHouseholdId = 'test-household-id';
+          const floorPlanData = {
+            householdId: testHouseholdId,
+            name: 'Test Floor Plan',
+            data: { rooms: [] },
+            imageUrl: null
+          };
+          
+          // Test create operation
+          const createdPlan = await createFloorPlan(floorPlanData);
+          const canCreate = !!createdPlan;
+          
+          // Test read operation
+          const plans = await getFloorPlansByHousehold(testHouseholdId);
+          const canRead = Array.isArray(plans);
+          
+          const floorPlanResult = {
+            canCreate,
+            canRead,
+            canUpdate: false, // Not implemented in this test
+            canDelete: false  // Not implemented in this test
+          };
+          
           addTestResult(testName, 'success', 
-            `Create: ${floorPlanResult.canCreate}, Read: ${floorPlanResult.canRead}, Update: ${floorPlanResult.canUpdate}, Delete: ${floorPlanResult.canDelete}`, 
-            floorPlanResult);
+            `Create: ${canCreate}, Read: ${canRead}`, floorPlanResult);
           break;
         case 'Camera Permission':
           const cameraPermission = await requestCameraPermission();

@@ -19,7 +19,7 @@ import {
   Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { seedService, seedDatabase, seedSpecificCollection, clearDatabase } from '@/services/seedService';
+import { seedService, seedDatabase, seedSpecificCollection, clearAllData } from '@/services/seedService';
 
 interface SeedDatabaseProps {
   className?: string;
@@ -45,7 +45,7 @@ export const SeedDatabase: React.FC<SeedDatabaseProps> = ({ className }) => {
       setSeededIds(ids);
       setIsSeeded(true);
       toast.success('Database seeded successfully!', {
-        description: 'All sample data has been added to Firestore.'
+        description: 'All sample data has been added to Supabase.'
       });
     } catch (error) {
       console.error('Error seeding database:', error);
@@ -65,7 +65,7 @@ export const SeedDatabase: React.FC<SeedDatabaseProps> = ({ className }) => {
       setSeededIds(ids);
       setIsSeeded(true);
       toast.success(`${dataType} seeded successfully!`, {
-        description: `Sample ${dataType} data has been added to Firestore.`
+        description: `Sample ${dataType} data has been added to Supabase.`
       });
     } catch (error) {
       console.error(`Error seeding ${dataType}:`, error);
@@ -80,11 +80,11 @@ export const SeedDatabase: React.FC<SeedDatabaseProps> = ({ className }) => {
   const handleClearAll = async () => {
     setIsLoading(true);
     try {
-      await clearDatabase();
+      await clearAllData();
       setSeededIds(new Map());
       setIsSeeded(false);
       toast.success('Database cleared successfully!', {
-        description: 'All seeded data has been removed from Firestore.'
+        description: 'All seeded data has been removed from Supabase.'
       });
     } catch (error) {
       console.error('Error clearing database:', error);
@@ -104,7 +104,7 @@ export const SeedDatabase: React.FC<SeedDatabaseProps> = ({ className }) => {
           Database Seeding Tool
         </CardTitle>
         <CardDescription>
-          Seed your Firestore database with sample data for testing the harmony system.
+          Seed your Supabase database with sample data for testing the harmony system.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

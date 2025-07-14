@@ -27,7 +27,15 @@ export const FaceCapture: React.FC = () => {
     isSynchronized: false,
   });
 
-  const storedHash = "5f7a..."; // from previous session or ID DB
+  const [storedHash, setStoredHash] = useState<string | null>(null);
+
+  // Load stored hash from localStorage or API
+  useEffect(() => {
+    const hash = localStorage.getItem('userBiometricHash');
+    if (hash) {
+      setStoredHash(hash);
+    }
+  }, []);
 
   // Synchronization logic
   const checkSynchronization = useCallback(() => {
@@ -63,6 +71,11 @@ export const FaceCapture: React.FC = () => {
   const onVerify = async () => {
     if (!synchronizedData.isSynchronized) {
       alert("Please wait for RGB and depth data to synchronize before verification.");
+      return;
+    }
+
+    if (!storedHash) {
+      alert("No stored biometric hash found. Please register your face first.");
       return;
     }
 

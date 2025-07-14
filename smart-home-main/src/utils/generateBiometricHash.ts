@@ -1,12 +1,14 @@
 export const generateBiometricHash = async (
   landmarks: Array<{ x: number; y: number; z: number }>,
-  depthMap: Uint16Array
+  depthMap: Uint16Array,
+  width: number = 640,
+  height: number = 480
 ): Promise<string> => {
   const data = [];
 
   for (let i = 0; i < landmarks.length; i++) {
     const pt = landmarks[i];
-    const index = Math.floor(pt.y * 480) * 640 + Math.floor(pt.x * 640);
+    const index = Math.floor(pt.y * height) * width + Math.floor(pt.x * width);
     const depth = depthMap[index] || 0;
 
     data.push(pt.x, pt.y, pt.z, depth);

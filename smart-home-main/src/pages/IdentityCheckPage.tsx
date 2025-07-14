@@ -1,38 +1,48 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react"; // Import useUser hook
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Shield, CheckCircle } from "lucide-react";
 import { IdentityCheck } from "@/components/IdentityCheck";
-import { checkVerificationStatus } from "@/utils/firestoreHelpers";
+// Import from your new Supabase helper file
+import { checkVerificationStatus } from "@/services/supabaseServices"; 
 
 const IdentityCheckPage = () => {
   const navigate = useNavigate();
-  const [currentUserId] = useState("user-id-from-auth"); // Replace with Clerk/Firebase auth
+  const { user, isLoaded } = useUser(); // Get user from Clerk
   const [isVerified, setIsVerified] = useState(false);
+  // isLoading now depends on Clerk's loading state and our check
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check verification status on component mount
   useEffect(() => {
-    const checkStatus = async () => {
-      const verified = await checkVerificationStatus(currentUserId);
-      setIsVerified(verified);
+    // Ensure the user object is loaded before checking status
+    if (isLoaded && user) {
+      const checkStatus = async () => {
+        setIsLoading(true); // Start loading
+        const verified = await checkVerificationStatus(user.id);
+        setIsVerified(verified);
+        setIsLoading(false); // Finish loading
+      };
+      checkStatus();
+    } else if (isLoaded && !user) {
+      // Handle case where there is no signed-in user
       setIsLoading(false);
-    };
-    checkStatus();
-  }, [currentUserId]);
+      navigate('/sign-in'); // Redirect to sign-in if not authenticated
+    }
+  }, [user, isLoaded, navigate]);
 
   const handleVerificationComplete = (verified: boolean) => {
     setIsVerified(verified);
     if (verified) {
-      // Auto-navigate back after successful verification
       setTimeout(() => {
-        navigate(-1); // Go back to previous page
+        navigate(-1); // Go back to the previous page
       }, 2000);
     }
   };
 
-  if (isLoading) {
+  // Show a loading state while Clerk is loading or we are checking status
+  if (isLoading || !isLoaded) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <div className="text-center">
@@ -43,6 +53,7 @@ const IdentityCheckPage = () => {
     );
   }
 
+  // If the user is verified, show the success screen
   if (isVerified) {
     return (
       <div className="min-h-screen bg-gradient-subtle py-12">
@@ -57,7 +68,6 @@ const IdentityCheckPage = () => {
               Back
             </Button>
           </div>
-
           <Card className="bg-card/60 backdrop-blur-sm border-border shadow-soft">
             <CardHeader className="text-center">
               <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
@@ -67,7 +77,7 @@ const IdentityCheckPage = () => {
                 Identity Already Verified
               </CardTitle>
               <p className="text-muted-foreground">
-                Your identity has been successfully verified. You can proceed with creating listings.
+                Your identity has been successfully verified.
               </p>
             </CardHeader>
             <CardContent className="text-center">
@@ -81,6 +91,7 @@ const IdentityCheckPage = () => {
     );
   }
 
+  // If not verified, show the verification component
   return (
     <div className="min-h-screen bg-gradient-subtle py-12">
       <div className="container mx-auto px-6 max-w-4xl">
@@ -94,7 +105,6 @@ const IdentityCheckPage = () => {
             Back
           </Button>
         </div>
-
         <Card className="bg-card/60 backdrop-blur-sm border-border shadow-soft">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
@@ -104,14 +114,16 @@ const IdentityCheckPage = () => {
               Identity Verification Required
             </CardTitle>
             <p className="text-muted-foreground">
-              Complete identity verification to build trust with potential roommates and unlock listing creation.
+              Complete verification to build trust and unlock listing creation.
             </p>
           </CardHeader>
           <CardContent>
-            <IdentityCheck 
-              currentUserId={currentUserId}
-              onVerificationComplete={handleVerificationComplete}
-            />
+            {user && ( // Only render if the user exists
+              <IdentityCheck 
+                currentUserId={user.id}
+                onVerificationComplete={handleVerificationComplete}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -119,4 +131,4 @@ const IdentityCheckPage = () => {
   );
 };
 
-export default IdentityCheckPage; 
+export default IdentityCheckPage;

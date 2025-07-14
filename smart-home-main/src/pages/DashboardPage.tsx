@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { doc, getDoc, getDocs, collection, query, where, addDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+// Firebase imports removed - using Supabase service instead
+import { 
+  getHousehold, 
+  getRentPayments, 
+  getBills, 
+  getChores, 
+  getSensors 
+} from "@/services/harmonyService";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ListingCard } from "@/components/ListingCard";

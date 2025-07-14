@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { doc, onSnapshot, setDoc, getDocs, collection, addDoc, updateDoc } from "firebase/firestore";
-import { checkVerificationStatus } from "@/utils/firestoreHelpers";
-import { db } from "@/lib/firebase";
+// REMOVE: import { checkVerificationStatus } from "@/utils/firestoreHelpers";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,9 +12,72 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import FloorPlanViewer from "@/components/FloorPlanViewer";
 import { IdentityCheck } from "@/components/IdentityCheck";
 import { VerificationBadge } from "@/components/VerificationBadge";
-import { saveVerificationResult } from "@/utils/firestoreHelpers";
+// REMOVE: import { saveVerificationResult } from "@/utils/firestoreHelpers";
 import { LocationVerifier, LocationVerificationData } from "@/components/LocationVerifier";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// --- Supabase Helper Functions for Verification ---
+// You would typically put these in a separate utils/supabaseHelpers.ts file
+// For this fix, they are placed here to demonstrate the replacement.
+
+/**
+ * Checks the verification status of a user from Supabase.
+ * @param userId The ID of the user to check.
+ * @returns A boolean indicating if the user is verified.
+ */
+export const checkVerificationStatusSupabase = async (userId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles') // Assuming a 'user_profiles' table for verification status
+      .select('is_verified')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error("Error checking verification status from Supabase:", error);
+      return false; // Assume not verified on error
+    }
+
+    return data?.is_verified || false;
+  } catch (error) {
+    console.error("Unexpected error checking verification status:", error);
+    return false;
+  }
+};
+
+/**
+ * Saves the verification result for a user to Supabase.
+ * @param userId The ID of the user.
+ * @param isVerified The verification status to save.
+ * @param verificationDetails Optional details about the verification.
+ */
+export const saveVerificationResultSupabase = async (
+  userId: string,
+  isVerified: boolean,
+  verificationDetails?: Record<string, any>
+): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('user_profiles') // Assuming a 'user_profiles' table
+      .update({
+        is_verified: isVerified,
+        verification_details: verificationDetails, // Store additional details if needed
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (error) {
+      throw error;
+    }
+    console.log(`Verification result for user ${userId} saved to Supabase: ${isVerified}`);
+  } catch (error) {
+    console.error("Error saving verification result to Supabase:", error);
+    throw error;
+  }
+};
+
+// --- End Supabase Helper Functions ---
+
 
 interface Listing {
   id?: string;
@@ -59,7 +121,8 @@ const CreateListingPage = () => {
   // Check verification status on component mount
   useEffect(() => {
     const checkStatus = async () => {
-      const verified = await checkVerificationStatus(currentUserId);
+      // USE SUPABASE HELPER HERE
+      const verified = await checkVerificationStatusSupabase(currentUserId);
       setIsIdentityVerified(verified);
     };
     checkStatus();
@@ -74,32 +137,44 @@ const CreateListingPage = () => {
   const startTimeRef = useRef<number>(0); // Track when sampling started
 
 
-  // Firestore functions
-  const saveListingToFirestore = async (listing: Listing) => {
+  // Supabase functions
+  const saveListingToSupabase = async (listing: Listing) => {
     try {
-      const docRef = await addDoc(collection(db, "listings"), {
-        ...listing,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        ownerId: currentUserId, // Use ownerId to match security rules
-      });
-      return docRef.id;
+      const { data, error } = await supabase
+        .from("listings")
+        .insert({
+          ...listing,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          owner_id: currentUserId,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data.id;
     } catch (error) {
-      console.error("Error saving listing to Firestore:", error);
+      console.error("Error saving listing to Supabase:", error);
       throw error;
     }
   };
 
-  const getListingsFromFirestore = async () => {
+  const getListingsFromSupabase = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "listings"));
-      const listings: Listing[] = [];
-      querySnapshot.forEach((doc) => {
-        listings.push({ id: doc.id, ...doc.data() } as Listing);
-      });
-      return listings;
+      const { data, error } = await supabase
+        .from("listings")
+        .select("*");
+
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
     } catch (error) {
-      console.error("Error getting listings from Firestore:", error);
+      console.error("Error getting listings from Supabase:", error);
       return [];
     }
   };
@@ -122,7 +197,8 @@ const CreateListingPage = () => {
     }
 
     // Check identity verification
-    const verified = await checkVerificationStatus(currentUserId);
+    // USE SUPABASE HELPER HERE
+    const verified = await checkVerificationStatusSupabase(currentUserId);
     if (!verified) {
       alert("Identity not verified. Please complete identity check.");
       return;
@@ -149,8 +225,8 @@ const CreateListingPage = () => {
         locationVerification: locationVerification, // Save the location verification data
       };
 
-      // Save to Firestore
-      const listingId = await saveListingToFirestore(newListing);
+      // Save to Supabase
+      const listingId = await saveListingToSupabase(newListing);
       console.log("Listing saved with ID:", listingId);
 
       // Navigate to dashboard
@@ -593,7 +669,10 @@ const CreateListingPage = () => {
               <CardContent>
                 <IdentityCheck 
                   currentUserId={currentUserId}
-                  onVerificationComplete={setIsIdentityVerified}
+                  // You might need to update IdentityCheck to use the new Supabase helper
+                  // If IdentityCheck internally calls saveVerificationResult, you'll need to pass
+                  // saveVerificationResultSupabase as a prop or update IdentityCheck itself.
+                  onVerificationComplete={setIsIdentityVerified} 
                 />
               </CardContent>
             </Card>

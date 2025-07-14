@@ -185,16 +185,16 @@ export const ComprehensiveTestRunner: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Firebase Tests */}
+          {/* Supabase Tests */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {renderTestResults(
-              results.firebase.firestore, 
-              'Firebase Firestore', 
+              results.supabase.database, 
+              'Supabase Database', 
               <Database className="h-5 w-5" />
             )}
             {renderTestResults(
-              results.firebase.storage, 
-              'Firebase Storage', 
+              results.supabase.storage, 
+              'Supabase Storage', 
               <HardDrive className="h-5 w-5" />
             )}
           </div>

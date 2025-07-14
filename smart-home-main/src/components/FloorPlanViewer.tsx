@@ -18,9 +18,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { storage, db } from '@/lib/firebase';
+// Firebase imports removed - using Supabase service instead
+import { supabase } from '@/lib/supabase';
 
 interface FloorPlanViewerProps {
   floorPlanUrl?: string;
@@ -113,11 +112,28 @@ const FloorPlanViewer = ({
 
     try {
       setIsLoading(true);
-      const floorPlanDoc = await getDoc(doc(db, 'floorPlans', householdId));
+      const { data, error } = await supabase
+        .from('floor_plans')
+        .select('*')
+        .eq('household_id', householdId)
+        .single();
       
-      if (floorPlanDoc.exists()) {
-        const data = floorPlanDoc.data() as FloorPlanData;
-        setCurrentFloorPlan(data);
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const floorPlanData: FloorPlanData = {
+          id: data.id,
+          householdId: data.household_id,
+          userId: data.user_id,
+          name: data.name,
+          fileUrl: data.file_url,
+          thumbnailUrl: data.thumbnail_url,
+          createdAt: new Date(data.created_at),
+          updatedAt: new Date(data.updated_at),
+        };
+        setCurrentFloorPlan(floorPlanData);
         setError(null);
       }
     } catch (error) {
@@ -134,26 +150,57 @@ const FloorPlanViewer = ({
       throw new Error('Missing householdId or userId');
     }
 
-    const floorPlanData: FloorPlanData = {
-      id: householdId,
-      householdId,
-      userId,
+    const floorPlanData = {
+      household_id: householdId,
+      user_id: userId,
       name,
-      fileUrl,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      file_url: fileUrl,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    await setDoc(doc(db, 'floorPlans', householdId), floorPlanData);
-    setCurrentFloorPlan(floorPlanData);
-    onFloorPlanUpdate?.(fileUrl);
+    const { data, error } = await supabase
+      .from('floor_plans')
+      .upsert(floorPlanData, { onConflict: 'household_id' })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (data) {
+      const savedData: FloorPlanData = {
+        id: data.id,
+        householdId: data.household_id,
+        userId: data.user_id,
+        name: data.name,
+        fileUrl: data.file_url,
+        thumbnailUrl: data.thumbnail_url,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      };
+      setCurrentFloorPlan(savedData);
+      onFloorPlanUpdate?.(fileUrl);
+    }
   };
 
-  // Upload file to Firebase Storage
+  // Upload file to Supabase Storage
   const uploadFileToStorage = async (file: File): Promise<string> => {
-    const storageRef = ref(storage, `floorplans/${householdId || 'default'}/${file.name}`);
-    const snapshot = await uploadBytes(storageRef, file);
-    return await getDownloadURL(snapshot.ref);
+    const filePath = `floorplans/${householdId || 'default'}/${file.name}`;
+    const { data, error } = await supabase.storage
+      .from('floorplans')
+      .upload(filePath, file);
+
+    if (error) {
+      throw error;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('floorplans')
+      .getPublicUrl(filePath);
+
+    return urlData.publicUrl;
   };
 
   // Handle file upload
@@ -165,7 +212,7 @@ const FloorPlanViewer = ({
       setIsLoading(true);
       setError(null);
 
-      // Upload to Firebase Storage
+      // Upload to Supabase Storage
       const fileUrl = await uploadFileToStorage(file);
       
       // Save to database

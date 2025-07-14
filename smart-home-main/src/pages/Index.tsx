@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+// Import your new Supabase service function
+import { getHousehold } from "@/services/harmonyService";
+import { checkUserProfileExists } from "@/services/supabaseServices";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/Navigation";
 import { HeroSection } from "@/components/HeroSection";
@@ -13,40 +14,37 @@ import { UserTypeModal } from "@/components/UserTypeModal";
 const Index = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { isSignedIn } = useUser();
+  const { user, isSignedIn } = useUser(); // Destructure 'user' to get the ID
 
-  const checkUserProfile = async (userId: string) => {
-    try {
-      const userDoc = await getDoc(doc(db, "users", userId));
-      return userDoc.exists();
-    } catch (error) {
-      console.error("Error checking user profile:", error);
-      return false;
-    }
-  };
+  // The checkUserProfile function is now handled in supabaseService.ts
+  // and imported as checkUserProfileExists.
 
   const handleCTAClick = async (type: 'find' | 'list') => {
-    if (isSignedIn) {
-      // Check if user already has a profile
-      const userId = "user123"; // Replace with actual user ID from auth
-      const hasProfile = await checkUserProfile(userId);
-      
-      if (type === 'find') {
-        if (hasProfile) {
-          // User has completed onboarding, go to dashboard
-          navigate('/dashboard');
-        } else {
-          // New user, go to onboarding first
-          navigate('/onboarding?type=seeker');
+    if (isSignedIn && user) {
+      try {
+        // Check if user already has a profile using the new service function
+        const hasProfile = await checkUserProfileExists(user.id);
+        
+        if (type === 'find') {
+          if (hasProfile) {
+            // User has completed onboarding, go to dashboard
+            navigate('/dashboard');
+          } else {
+            // New user, go to onboarding first
+            navigate('/onboarding?type=seeker');
+          }
+        } else { // type === 'list'
+          if (hasProfile) {
+            // User has completed onboarding, go to create listing
+            navigate('/create-listing');
+          } else {
+            // New user, go to onboarding first
+            navigate('/onboarding?type=lister');
+          }
         }
-      } else {
-        if (hasProfile) {
-          // User has completed onboarding, go to create listing
-          navigate('/create-listing');
-        } else {
-          // New user, go to onboarding first
-          navigate('/onboarding?type=lister');
-        }
+      } catch (error) {
+          console.error("Failed to check user profile:", error);
+          // Optionally, handle the error in the UI
       }
     } else {
       setIsModalOpen(true);
@@ -54,8 +52,7 @@ const Index = () => {
   };
 
   const handleUserTypeSelect = (userType: 'seeker' | 'lister') => {
-    console.log('User selected:', userType);
-    // For non-signed-in users, use navigate instead of window.location.href
+    // For non-signed-in users, navigate to the correct onboarding flow
     navigate(`/onboarding?type=${userType}`);
   };
 
